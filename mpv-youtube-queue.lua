@@ -243,8 +243,12 @@ local function play_next_in_queue()
     end
     local next_video_url = next_video.url
     print_video_name(next_video)
-    mp.commandv("loadfile", next_video_url, "append-play")
-    mp.set_property_number("playlist-pos", YouTubeQueue.get_current_index())
+    if YouTubeQueue.size() > 1 then
+        mp.commandv("loadfile", next_video_url, "append-play")
+        mp.set_property_number("playlist-pos", YouTubeQueue.get_current_index())
+    else
+        mp.commandv("loadfile", next_video_url, "replace")
+    end
 end
 
 -- add the video to the queue from the clipboard
