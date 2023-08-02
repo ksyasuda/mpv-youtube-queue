@@ -23,7 +23,6 @@ mp.options = require 'mp.options'
 local YouTubeQueue = {}
 local video_queue = {}
 local current_video = nil
-local queue_is_displayed = false
 local index = 0
 
 local options = {
@@ -40,6 +39,33 @@ local options = {
     clipboard_command = "xclip -o"
 }
 mp.options.read_options(options, "mpv-youtube-queue")
+
+-- HELPERS {{{
+
+-- print the name of the current video to the OSD
+local function print_video_name(video, time)
+    if not video then
+        return
+    end
+    if not time then
+        time = 2
+    end
+    mp.osd_message('Playing:' .. video.name, time)
+end
+
+-- Function to get the video name from a YouTube URL
+local function get_video_name(url)
+    local command = 'yt-dlp --get-title ' .. url
+    local handle = io.popen(command)
+    if not handle then
+        return nil
+    end
+    local result = handle:read("*a")
+    handle:close()
+    return result:gsub("%s+$", "")
+end
+
+-- }}}
 
 -- QUEUE GETTERS AND SETTERS {{{
 
@@ -61,6 +87,15 @@ end
 
 function YouTubeQueue.get_current_video()
     return current_video
+end
+
+
+function YouTubeQueue.get_video_at(idx)
+    if idx <= 0 or idx > #video_queue then
+        mp.osd_message("Invalid video index")
+        return nil
+    end
+    return video_queue[idx]
 end
 
 -- }}}
@@ -98,7 +133,8 @@ function YouTubeQueue.play_video_at(idx)
     end
     index = idx
     current_video = video_queue[index]
-    mp.commandv("loadfile", current_video.url, "replace")
+    mp.commandv("loadfile", current_video.url, "append-play")
+    mp.set_property_number("playlist-pos", index)
     return current_video
 end
 
@@ -122,41 +158,51 @@ function YouTubeQueue.update_current_index()
     end
     -- if not found, reset the index
     index = 0
+    current_video = YouTubeQueue.get_video_at(index)
 end
 
 -- Function to be called when the end-file event is triggered
 function YouTubeQueue.on_end_file(event)
     if event.reason == "eof" then  -- The file ended normally
-        mp.msg.log("info", "End of file reached")
         YouTubeQueue.update_current_index()
+        print_video_name(YouTubeQueue.get_current_video())
     end
 end
 
 -- Function to be called when the track-changed event is triggered
 function YouTubeQueue.on_track_changed()
-    mp.msg.log("info", "Track changed")
     YouTubeQueue.update_current_index()
+    print_video_name(YouTubeQueue.get_current_video())
 end
 
 -- Function to be called when the playback-restart event is triggered
 function YouTubeQueue.on_playback_restart()
     YouTubeQueue.update_current_index()
+    print_video_name(YouTubeQueue.get_current_video())
+end
+
+
+function YouTubeQueue.print_queue(duration)
+    local queue = YouTubeQueue.get_video_queue()
+    local current_index = YouTubeQueue.get_current_index()
+    if not duration then
+        duration = 5
+    end
+    if #queue > 0 then
+        local message = ""
+        for i, v in ipairs(queue) do
+            local prefix = (i == current_index) and "=> " or "   "
+            message = message .. prefix .. i .. ". " .. v.name .. "\n"
+        end
+        mp.osd_message(message, duration)
+    else
+        mp.osd_message("No videos in the queue or history.")
+    end
 end
 
 -- }}}
 
 -- MAIN FUNCTIONS {{{
--- Function to get the video name from a YouTube URL
-local function get_video_name(url)
-    local command = 'yt-dlp --get-title ' .. url
-    local handle = io.popen(command)
-    if not handle then
-        return nil
-    end
-    local result = handle:read("*a")
-    handle:close()
-    return result:gsub("%s+$", "")
-end
 
 -- returns the content of the clipboard
 local function get_clipboard_content()
@@ -169,48 +215,27 @@ local function get_clipboard_content()
     return result
 end
 
-
--- print the queue to the OSD
-local function print_queue()
-    local complete_list = YouTubeQueue.get_video_queue()
-    local current_index = YouTubeQueue.get_current_index()
-    if #complete_list > 0 then
-        local message = ""
-        for i, v in ipairs(complete_list) do
-            local prefix = (i == current_index) and "=> " or "   "
-            message = message .. prefix .. i .. ". " .. v.name .. "\n"
-        end
-        mp.osd_message(message, 5)
-        queue_is_displayed = true
-    else
-        mp.osd_message("No videos in the queue or history.")
-    end
-end
-
 local function move_selection_up()
     local current_index = YouTubeQueue.get_current_index()
-    if queue_is_displayed and current_index > 1 then
+    if current_index > 1 then
         current_index = current_index - 1
         YouTubeQueue.set_current_index(current_index)
-        print_queue()
+        YouTubeQueue.print_queue()
     end
 end
 
 local function move_selection_down()
     local current_index = YouTubeQueue.get_current_index()
-    if queue_is_displayed and current_index < YouTubeQueue.size() then
+    if current_index < YouTubeQueue.size() then
         current_index = current_index + 1
         YouTubeQueue.set_current_index(current_index)
-        print_queue()
+        YouTubeQueue.print_queue()
     end
 end
 
 local function play_selected_video()
     local current_index = YouTubeQueue.get_current_index()
-    if queue_is_displayed then
-        YouTubeQueue.play_video_at(current_index)
-        queue_is_displayed = false
-    end
+    YouTubeQueue.play_video_at(current_index)
 end
 
 -- play the next video in the queue
@@ -220,14 +245,9 @@ local function play_next_in_queue()
         return
     end
     local next_video_url = next_video.url
-    local name = next_video.name
-    -- append the next video to the playlist
+    print_video_name(next_video)
     mp.commandv("loadfile", next_video_url, "append-play")
-    -- get the index of the last item in the playlist
-    local playlist_count = mp.get_property_number("playlist-count")
-    -- play the last item in the playlist
-    mp.set_property_number("playlist-pos", playlist_count - 1)
-    mp.osd_message("Playing " .. name)
+    mp.set_property_number("playlist-pos", YouTubeQueue.get_current_index())
 end
 
 -- add the video to the queue from the clipboard
@@ -259,10 +279,9 @@ local function play_previous_video()
         return
     end
     local previous_video_url = previous_video.url
-    local name = previous_video.name
-    mp.commandv("loadfile", previous_video_url, "replace")
-    mp.commandv("loadfile", current_video.url, "append-play")
-    mp.osd_message("Playing " .. name)
+    print_video_name(previous_video)
+    mp.commandv("loadfile", previous_video_url, "append-play")
+    mp.set_property_number("playlist-pos", YouTubeQueue.get_current_index())
 end
 
 local function open_url_in_browser(url)
@@ -278,9 +297,7 @@ end
 
 
 local function print_current_video()
-    local current_url = mp.get_property("path")
-    local current_name = get_video_name(current_url)
-    mp.osd_message("Currently playing " .. current_name, 3)
+    mp.osd_message("Currently playing " .. current_video.name, 3)
 end
 -- }}}
 
@@ -288,7 +305,7 @@ end
 mp.add_key_binding(options.add_to_queue, "add_to_queue", add_to_queue)
 mp.add_key_binding(options.play_next_in_queue, "play_next_in_queue", play_next_in_queue)
 mp.add_key_binding(options.play_previous_in_queue, "play_previous_video", play_previous_video)
-mp.add_key_binding(options.print_queue, "print_queue", print_queue)
+mp.add_key_binding(options.print_queue, "print_queue", YouTubeQueue.print_queue)
 mp.add_key_binding(options.move_selection_up, "move_selection_up", move_selection_up)
 mp.add_key_binding(options.move_selection_down, "move_selection_down", move_selection_down)
 mp.add_key_binding(options.play_selected_video, "play_selected_video", play_selected_video)
@@ -301,5 +318,3 @@ mp.register_event("track-changed", YouTubeQueue.on_track_changed)
 mp.register_event("playback-restart", YouTubeQueue.on_playback_restart)
 -- }}}
 
-
-return YouTubeQueue
