@@ -133,8 +133,8 @@ function YouTubeQueue.play_video_at(idx)
     end
     index = idx
     current_video = video_queue[index]
-    mp.commandv("loadfile", current_video.url, "append-play")
-    mp.set_property_number("playlist-pos", index)
+    mp.msg.log("info", "Playing video at index " .. index)
+    mp.set_property_number("playlist-pos", index - 1) -- zero-based index
     return current_video
 end
 
@@ -244,8 +244,7 @@ local function play_next_in_queue()
     local next_video_url = next_video.url
     print_video_name(next_video)
     if YouTubeQueue.size() > 1 then
-        mp.commandv("loadfile", next_video_url, "append-play")
-        mp.set_property_number("playlist-pos", YouTubeQueue.get_current_index())
+        mp.set_property_number("playlist-pos", YouTubeQueue.get_current_index() - 1)
     else
         mp.commandv("loadfile", next_video_url, "replace")
     end
@@ -279,10 +278,8 @@ local function play_previous_video()
         mp.osd_message("No previous video available.")
         return
     end
-    local previous_video_url = previous_video.url
     print_video_name(previous_video)
-    mp.commandv("loadfile", previous_video_url, "append-play")
-    mp.set_property_number("playlist-pos", YouTubeQueue.get_current_index())
+    mp.set_property_number("playlist-pos", YouTubeQueue.get_current_index() - 1)
 end
 
 local function open_url_in_browser(url)
