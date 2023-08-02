@@ -33,6 +33,7 @@ local options = {
     move_selection_down = "ctrl+DOWN",
     play_selected_video = "ctrl+ENTER",
     open_video_in_browser = "ctrl+o",
+    open_channel_in_browser = "ctrl+O",
     print_current_video = "ctrl+P",
     browser = "firefox",
     clipboard_command = "xclip -o"
@@ -56,6 +57,25 @@ local function get_video_name(url)
     local result = handle:read("*a")
     handle:close()
     return result:gsub("%s+$", "")
+end
+
+-- get the channel url from a video url
+local function get_channel_url(url)
+    local command = 'yt-dlp --print channel_url --playlist-items 1 ' .. url
+    local handle = io.popen(command)
+    if not handle then return nil end
+    local result = handle:read("*a")
+    handle:close()
+    return result:gsub("%s+$", "")
+end
+
+local function is_valid_ytdlp_url(url)
+    local command = 'yt-dlp --simulate \'' .. url .. '\' >/dev/null 2>&1'
+    mp.msg.log("info", "Checking if URL is valid: " .. command)
+    local handle = io.popen(command .. "; echo $?")
+    local result = handle:read("*a")
+    handle:close()
+    return result:gsub("%s+$", "") == "0"
 end
 
 -- }}}
@@ -113,7 +133,6 @@ function YouTubeQueue.play_video_at(idx)
     end
     index = idx
     current_video = video_queue[index]
-    mp.msg.log("info", "Playing video at index " .. index)
     mp.set_property_number("playlist-pos", index - 1) -- zero-based index
     return current_video
 end
@@ -176,7 +195,10 @@ end
 -- returns the content of the clipboard
 local function get_clipboard_content()
     local handle = io.popen(options.clipboard_command)
-    if not handle then return nil end
+    if not handle then
+        mp.osd_message("Error getting clipboard content")
+        return nil
+    end
     local result = handle:read("*a")
     handle:close()
     return result
@@ -227,15 +249,28 @@ end
 -- add the video to the queue from the clipboard
 local function add_to_queue()
     local url = get_clipboard_content()
-    -- get video name in background
-    local name = get_video_name(url)
-
-    -- check to make sure the video is not already in the queue
+    if not url then
+        mp.osd_message("Nothing found in the clipboard.")
+        return
+    end
+    if not string.match(url, "^https://www.youtube.com") then
+        mp.osd_message("Not a YouTube URL.")
+        return
+    end
     if YouTubeQueue.is_in_queue(url) then
         mp.osd_message("Video already in queue.")
         return
+    elseif not is_valid_ytdlp_url(url) then
+        mp.osd_message("Invalid URL.")
+        return
     end
-    YouTubeQueue.add_to_queue({ url = url, name = name })
+    local name = get_video_name(url)
+    local channel_url = get_channel_url(url)
+    YouTubeQueue.add_to_queue({
+        url = url,
+        name = name,
+        channel_url = channel_url
+    })
     if not YouTubeQueue.get_current_video() then
         play_next_in_queue()
     else
@@ -261,9 +296,10 @@ local function open_url_in_browser(url)
     os.execute(command)
 end
 
-local function open_video_in_browser()
-    local current_url = mp.get_property("path")
-    open_url_in_browser(current_url)
+local function open_video_in_browser() open_url_in_browser(current_video.url) end
+
+local function open_channel_in_browser()
+    open_url_in_browser(current_video.channel_url)
 end
 
 local function print_current_video()
@@ -288,6 +324,8 @@ mp.add_key_binding(options.open_video_in_browser, "open_video_in_browser",
     open_video_in_browser)
 mp.add_key_binding(options.print_current_video, "print_current_video",
     print_current_video)
+mp.add_key_binding(options.open_channel_in_browser, "open_channel_in_browser",
+    open_channel_in_browser)
 
 -- Listen for the file-loaded event
 mp.register_event("end-file", YouTubeQueue.on_end_file)
