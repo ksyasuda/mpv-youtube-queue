@@ -71,9 +71,10 @@ end
 
 local function is_valid_ytdlp_url(url)
     local command = 'yt-dlp --simulate \'' .. url .. '\' >/dev/null 2>&1'
-    mp.msg.log("info", "Checking if URL is valid: " .. command)
     local handle = io.popen(command .. "; echo $?")
+    if not handle then return false end
     local result = handle:read("*a")
+    if not result then return false end
     handle:close()
     return result:gsub("%s+$", "") == "0"
 end
