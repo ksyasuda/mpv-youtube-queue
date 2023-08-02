@@ -111,6 +111,38 @@ function YouTubeQueue.is_in_queue(url)
     return false
 end
 
+-- Function to find the index of the currently playing video
+function YouTubeQueue.update_current_index()
+    local current_url = mp.get_property("path")
+    for i, v in ipairs(video_queue) do
+        if v.url == current_url then
+            index = i
+            return
+        end
+    end
+    -- if not found, reset the index
+    index = 0
+end
+
+-- Function to be called when the end-file event is triggered
+function YouTubeQueue.on_end_file(event)
+    if event.reason == "eof" then  -- The file ended normally
+        mp.msg.log("info", "End of file reached")
+        YouTubeQueue.update_current_index()
+    end
+end
+
+-- Function to be called when the track-changed event is triggered
+function YouTubeQueue.on_track_changed()
+    mp.msg.log("info", "Track changed")
+    YouTubeQueue.update_current_index()
+end
+
+-- Function to be called when the playback-restart event is triggered
+function YouTubeQueue.on_playback_restart()
+    YouTubeQueue.update_current_index()
+end
+
 -- }}}
 
 -- MAIN FUNCTIONS {{{
@@ -189,7 +221,12 @@ local function play_next_in_queue()
     end
     local next_video_url = next_video.url
     local name = next_video.name
-    mp.commandv("loadfile", next_video_url, "replace")
+    -- append the next video to the playlist
+    mp.commandv("loadfile", next_video_url, "append-play")
+    -- get the index of the last item in the playlist
+    local playlist_count = mp.get_property_number("playlist-count")
+    -- play the last item in the playlist
+    mp.set_property_number("playlist-pos", playlist_count - 1)
     mp.osd_message("Playing " .. name)
 end
 
@@ -223,12 +260,9 @@ local function play_previous_video()
     end
     local previous_video_url = previous_video.url
     local name = previous_video.name
-    if previous_video_url then
-        mp.commandv("loadfile", previous_video_url, "replace")
-        mp.osd_message("Playing " .. name)
-    else
-        mp.osd_message("No previous video available.")
-    end
+    mp.commandv("loadfile", previous_video_url, "replace")
+    mp.commandv("loadfile", current_video.url, "append-play")
+    mp.osd_message("Playing " .. name)
 end
 
 local function open_url_in_browser(url)
@@ -262,7 +296,9 @@ mp.add_key_binding(options.open_video_in_browser, "open_video_in_browser", open_
 mp.add_key_binding(options.print_current_video, "print_current_video", print_current_video)
 
 -- Listen for the file-loaded event
--- mp.register_event("file-loaded", update_current_index)
+mp.register_event("end-file", YouTubeQueue.on_end_file)
+mp.register_event("track-changed", YouTubeQueue.on_track_changed)
+mp.register_event("playback-restart", YouTubeQueue.on_playback_restart)
 -- }}}
 
 
