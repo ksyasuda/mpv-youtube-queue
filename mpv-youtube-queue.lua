@@ -165,20 +165,17 @@ end
 function YouTubeQueue.on_end_file(event)
     if event.reason == "eof" then  -- The file ended normally
         YouTubeQueue.update_current_index()
-        print_video_name(YouTubeQueue.get_current_video())
     end
 end
 
 -- Function to be called when the track-changed event is triggered
 function YouTubeQueue.on_track_changed()
     YouTubeQueue.update_current_index()
-    print_video_name(YouTubeQueue.get_current_video())
 end
 
 -- Function to be called when the playback-restart event is triggered
 function YouTubeQueue.on_playback_restart()
     YouTubeQueue.update_current_index()
-    print_video_name(YouTubeQueue.get_current_video())
 end
 
 
