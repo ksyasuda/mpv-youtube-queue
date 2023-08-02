@@ -112,6 +112,7 @@ function YouTubeQueue.add_to_queue(video) table.insert(video_queue, video) end
 function YouTubeQueue.next_in_queue()
     if index < #video_queue then
         index = index + 1
+        selected_index = index
         current_video = video_queue[index]
         return current_video
     end
@@ -120,6 +121,7 @@ end
 function YouTubeQueue.prev_in_queue()
     if index > 1 then
         index = index - 1
+        selected_index = index
         current_video = video_queue[index]
     else
         current_video = video_queue[1]
@@ -133,6 +135,7 @@ function YouTubeQueue.play_video_at(idx)
         return nil
     end
     index = idx
+    selected_index = index
     current_video = video_queue[index]
     mp.set_property_number("playlist-pos", index - 1) -- zero-based index
     return current_video
@@ -154,6 +157,7 @@ function YouTubeQueue.update_current_index()
     end
     -- if not found, reset the index
     index = 0
+    selected_index = index
     current_video = YouTubeQueue.get_video_at(index)
 end
 
