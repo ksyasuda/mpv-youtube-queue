@@ -40,7 +40,7 @@ local options = {
     browser = "firefox",
     clipboard_command = "xclip -o",
     display_limit = 6,
-    cursor_icon = "",
+    cursor_icon = "🠺",
     font_size = 24,
     font_name = "JetBrains Mono",
 }
