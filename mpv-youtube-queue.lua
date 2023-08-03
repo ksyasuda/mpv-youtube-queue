@@ -1,7 +1,5 @@
 -- mpv-youtube-queue.lua
 --
--- mpv-youtube-queue.lua
---
 -- YouTube 'Add To Queue' for mpv
 --
 -- Copyright (C) 2023 sudacode
@@ -42,14 +40,14 @@ local options = {
     display_limit = 6,
     cursor_icon = "🠺",
     font_size = 24,
-    font_name = "JetBrains Mono",
+    font_name = "JetBrains Mono"
 }
 
 local colors = {
     error = "676EFF",
     text = "BFBFBF",
     selected_color = "F993BD",
-    cursor = "FDE98B",
+    cursor = "FDE98B"
 }
 
 mp.options.read_options(options, "mpv-youtube-queue")
@@ -63,18 +61,16 @@ local display_offset = 0
 local function sleep(n) os.execute("sleep " .. tonumber(n)) end
 
 local function print_osd_message(message, duration, color)
-    if not color then
-        color = colors.text
-    end
-    mp.osd_message(styleOn .. "{\\c&" .. color .. "&}" .. message .. "{\\c&" .. colors.text .. "&}" .. styleOff .. "\n",
-        duration)
+    if not color then color = colors.text end
+    mp.osd_message(styleOn .. "{\\c&" .. color .. "&}" .. message .. "{\\c&" ..
+        colors.text .. "&}" .. styleOff .. "\n", duration)
 end
 
 -- print the name of the current video to the OSD
 local function print_video_name(video, duration)
     if not video then return end
     if not duration then duration = 2 end
-    print_osd_message('Currently playing: ' .. video.name, duration)
+    print_osd_message('Playing: ' .. video.name, duration)
 end
 
 -- Function to get the video name from a YouTube URL
@@ -168,9 +164,7 @@ end
 -- Function to find the index of the currently playing video
 function YouTubeQueue.update_current_index()
     local current_url = mp.get_property("path")
-    if #video_queue == 0 then
-        return
-    end
+    if #video_queue == 0 then return end
     for i, v in ipairs(video_queue) do
         if v.url == current_url then
             index = i
@@ -207,33 +201,31 @@ function YouTubeQueue.print_queue(duration)
         display_offset = start_index - 1
 
         for i = start_index, end_index do
-            local prefix = (i == selected_index) and
-                styleOn ..
-                "{\\c&" ..
-                colors.cursor ..
-                "&}" .. options.cursor_icon .. " " .. "{\\c&" .. colors.text .. "&}" .. styleOff
-                or
+            local prefix = (i == selected_index) and styleOn .. "{\\c&" ..
+                colors.cursor .. "&}" .. options.cursor_icon ..
+                " " .. "{\\c&" .. colors.text .. "&}" .. styleOff or
                 "   "
             if i == current_index then
-                message = message ..
-                    prefix ..
-                    styleOn .. "{\b1\\c&" .. colors.selected_color .. "&}" .. i .. ". " .. video_queue[i].name ..
-                    "{\\c&" .. colors.text .. "&\b0}" .. styleOff .. "\n"
+                message = message .. prefix .. styleOn .. "{\b1\\c&" ..
+                    colors.selected_color .. "&}" .. i .. ". " ..
+                    video_queue[i].name .. "{\\c&" .. colors.text ..
+                    "&\b0}" .. styleOff .. "\n"
             elseif i == 2 then
-                message = message ..
-                    prefix ..
-                    styleOn .. "{\\c&" .. colors.text .. "&\b0}" .. styleOff .. i .. ". " .. video_queue[i].name ..
+                message =
+                    message .. prefix .. styleOn .. "{\\c&" .. colors.text ..
+                    "&\b0}" .. styleOff .. i .. ". " .. video_queue[i].name ..
                     "\n"
             else
-                message = message ..
-                    prefix ..
-                    styleOn .. "{\\c&" .. colors.text .. "&\b0}" .. styleOff .. i .. ". " .. video_queue[i].name ..
+                message =
+                    message .. prefix .. styleOn .. "{\\c&" .. colors.text ..
+                    "&\b0}" .. styleOff .. i .. ". " .. video_queue[i].name ..
                     "\n"
             end
         end
         mp.osd_message(message, duration)
     else
-        print_osd_message("No videos in the queue or history.", duration, colors.error)
+        print_osd_message("No videos in the queue or history.", duration,
+            colors.error)
     end
 end
 
@@ -245,7 +237,8 @@ end
 local function get_clipboard_content()
     local handle = io.popen(options.clipboard_command)
     if not handle then
-        print_osd_message("Error getting clipboard content", MSG_DURATION, colors.error)
+        print_osd_message("Error getting clipboard content", MSG_DURATION,
+            colors.error)
         return nil
     end
     local result = handle:read("*a")
@@ -285,7 +278,6 @@ local function play_video_at(idx)
     return current_video
 end
 
-
 local function play_selected_video()
     -- local current_index = YouTubeQueue.get_current_index()
     local video = play_video_at(selected_index)
@@ -314,7 +306,8 @@ end
 local function add_to_queue()
     local url = get_clipboard_content()
     if not url then
-        print_osd_message("Nothing found in the clipboard.", MSG_DURATION, colors.error)
+        print_osd_message("Nothing found in the clipboard.", MSG_DURATION,
+            colors.error)
         return
     end
     if YouTubeQueue.is_in_queue(url) then
@@ -326,12 +319,14 @@ local function add_to_queue()
     end
     local name = get_video_name(url)
     if not name then
-        print_osd_message("Error getting video name.", MSG_DURATION, colors.error)
+        print_osd_message("Error getting video name.", MSG_DURATION,
+            colors.error)
         return
     end
     local channel_url = get_channel_url(url)
     if not channel_url then
-        print_osd_message("Error getting channel URL.", MSG_DURATION, colors.error)
+        print_osd_message("Error getting channel URL.", MSG_DURATION,
+            colors.error)
         return
     end
 
@@ -353,7 +348,8 @@ local function play_previous_video()
     local previous_video = YouTubeQueue.prev_in_queue()
     local current_index = YouTubeQueue.get_current_index()
     if not previous_video then
-        print_osd_message("No previous video available.", MSG_DURATION, colors.error)
+        print_osd_message("No previous video available.", MSG_DURATION,
+            colors.error)
         return
     end
     mp.set_property_number("playlist-pos", current_index - 1)
