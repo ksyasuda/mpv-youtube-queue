@@ -22,7 +22,7 @@ local video_queue = {}
 local current_video = nil
 local index = 0
 local selected_index = 1
-local SLEEP_TIME = 1.5
+local MSG_DURATION = 1.5
 
 local options = {
     add_to_queue = "ctrl+a",
@@ -36,11 +36,18 @@ local options = {
     open_channel_in_browser = "ctrl+O",
     print_current_video = "ctrl+P",
     browser = "firefox",
-    clipboard_command = "xclip -o"
+    clipboard_command = "xclip -o",
+    display_limit = 6
 }
 mp.options.read_options(options, "mpv-youtube-queue")
 
+local display_limit = options.display_limit
+local display_offset = 0
+
 -- HELPERS {{{
+
+-- run sleep shell command for n seconds
+local function sleep(n) os.execute("sleep " .. tonumber(n)) end
 
 -- print the name of the current video to the OSD
 local function print_video_name(video, duration)
@@ -175,17 +182,21 @@ function YouTubeQueue.on_track_changed() YouTubeQueue.update_current_index() end
 function YouTubeQueue.on_playback_restart() YouTubeQueue.update_current_index() end
 
 function YouTubeQueue.print_queue(duration)
-    local queue = YouTubeQueue.get_video_queue()
-    local current_index = YouTubeQueue.get_current_index()
-    if not duration then duration = 5 end
-    if #queue > 0 then
+    local current_index = index
+    if not duration then duration = 3 end
+    if #video_queue > 0 then
         local message = ""
-        for i, v in ipairs(queue) do
+        local start_index = math.max(1, selected_index - display_limit / 2)
+        local end_index =
+            math.min(#video_queue, start_index + display_limit - 1)
+        display_offset = start_index - 1
+
+        for i = start_index, end_index do
             local prefix = (i == current_index and i == selected_index) and
                 "=>> " or (i == current_index) and "=> " or
                 (i == selected_index) and "> " or "   "
-            -- prefix = (i == selected_index) and prefix .. "> " or prefix
-            message = message .. prefix .. i .. ". " .. v.name .. "\n"
+            message = message .. prefix .. i .. ". " .. video_queue[i].name ..
+                "\n"
         end
         mp.osd_message(message, duration)
     else
@@ -213,7 +224,10 @@ local function move_selection_up()
     -- selected_index = YouTubeQueue.get_current_index()
     if selected_index > 1 then
         selected_index = selected_index - 1
-        YouTubeQueue.print_queue()
+        if selected_index < display_offset + 1 then
+            display_offset = display_offset - 1
+        end
+        YouTubeQueue.print_queue(MSG_DURATION)
     end
 end
 
@@ -222,18 +236,19 @@ local function move_selection_down()
     if selected_index < YouTubeQueue.size() then
         selected_index = selected_index + 1
         -- YouTubeQueue.set_current_index(current_index)
-        YouTubeQueue.print_queue()
+        if selected_index > display_offset + display_limit then
+            display_offset = display_offset + 1
+        end
+        YouTubeQueue.print_queue(MSG_DURATION)
     end
 end
-
-local function sleep(n) os.execute("sleep " .. tonumber(n)) end
 
 local function play_selected_video()
     -- local current_index = YouTubeQueue.get_current_index()
     local video = YouTubeQueue.play_video_at(selected_index)
-    YouTubeQueue.print_queue(SLEEP_TIME - 0.5)
-    sleep(SLEEP_TIME)
-    print_video_name(video, SLEEP_TIME)
+    YouTubeQueue.print_queue(MSG_DURATION - 0.5)
+    sleep(MSG_DURATION)
+    print_video_name(video, MSG_DURATION)
 end
 
 -- play the next video in the queue
@@ -247,8 +262,8 @@ local function play_next_in_queue()
     else
         mp.commandv("loadfile", next_video_url, "replace")
     end
-    print_video_name(next_video, SLEEP_TIME)
-    sleep(SLEEP_TIME)
+    print_video_name(next_video, MSG_DURATION)
+    sleep(MSG_DURATION)
 end
 
 -- add the video to the queue from the clipboard
@@ -292,8 +307,8 @@ local function play_previous_video()
         return
     end
     mp.set_property_number("playlist-pos", YouTubeQueue.get_current_index() - 1)
-    print_video_name(previous_video, SLEEP_TIME)
-    sleep(SLEEP_TIME)
+    print_video_name(previous_video, MSG_DURATION)
+    sleep(MSG_DURATION)
 end
 
 local function open_url_in_browser(url)
