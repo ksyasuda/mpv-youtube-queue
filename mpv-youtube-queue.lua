@@ -37,12 +37,22 @@ local options = {
     print_current_video = "ctrl+P",
     browser = "firefox",
     clipboard_command = "xclip -o",
-    display_limit = 6
+    display_limit = 6,
+    cursor_icon = " ",
+    -- cursor_icon = " ",
+    font_size = 24,
+    font_name = "JetBrains Mono Nerd Font",
+    selected_color = "F993BD",
+    cursor_color = "FDE98B"
 }
+
 mp.options.read_options(options, "mpv-youtube-queue")
 
 local display_limit = options.display_limit
 local display_offset = 0
+
+local styleOn = mp.get_property("osd-ass-cc/0")
+local styleOff = mp.get_property("osd-ass-cc/1")
 
 -- HELPERS {{{
 
@@ -96,7 +106,10 @@ function YouTubeQueue.get_current_index() return index end
 
 function YouTubeQueue.get_video_queue() return video_queue end
 
-function YouTubeQueue.set_current_index(idx) index = idx end
+function YouTubeQueue.set_current_index(idx)
+    index = idx
+    current_video = video_queue[idx]
+end
 
 function YouTubeQueue.get_current_video() return current_video end
 
@@ -136,18 +149,6 @@ function YouTubeQueue.prev_in_queue()
     return current_video
 end
 
-function YouTubeQueue.play_video_at(idx)
-    if idx <= 0 or idx > #video_queue then
-        mp.osd_message("Invalid video index")
-        return nil
-    end
-    index = idx
-    selected_index = index
-    current_video = video_queue[index]
-    mp.set_property_number("playlist-pos", index - 1) -- zero-based index
-    return current_video
-end
-
 function YouTubeQueue.is_in_queue(url)
     for _, v in ipairs(video_queue) do if v.url == url then return true end end
     return false
@@ -156,6 +157,9 @@ end
 -- Function to find the index of the currently playing video
 function YouTubeQueue.update_current_index()
     local current_url = mp.get_property("path")
+    if #video_queue == 0 then
+        return
+    end
     for i, v in ipairs(video_queue) do
         if v.url == current_url then
             index = i
@@ -192,11 +196,19 @@ function YouTubeQueue.print_queue(duration)
         display_offset = start_index - 1
 
         for i = start_index, end_index do
-            local prefix = (i == current_index and i == selected_index) and
-                "=>> " or (i == current_index) and "=> " or
-                (i == selected_index) and "> " or "   "
-            message = message .. prefix .. i .. ". " .. video_queue[i].name ..
-                "\n"
+            local prefix = (i == selected_index) and
+                styleOn ..
+                "{\\c&" .. options.cursor_color .. "&}" .. options.cursor_icon .. "{\\c&BFBFBF&\b0}" .. styleOff
+                or "   "
+            if i == current_index then
+                message = message ..
+                    prefix ..
+                    styleOn .. "{\b1\\c&" .. options.selected_color .. "&}" .. i .. ". " .. video_queue[i].name ..
+                    "\n" .. "{\\c&BFBFBF&\b0}" .. styleOff
+            else
+                message = message .. prefix .. i .. ". " .. video_queue[i].name ..
+                    "\n"
+            end
         end
         mp.osd_message(message, duration)
     else
@@ -221,7 +233,6 @@ local function get_clipboard_content()
 end
 
 local function move_selection_up()
-    -- selected_index = YouTubeQueue.get_current_index()
     if selected_index > 1 then
         selected_index = selected_index - 1
         if selected_index < display_offset + 1 then
@@ -232,10 +243,8 @@ local function move_selection_up()
 end
 
 local function move_selection_down()
-    -- selected_index = YouTubeQueue.get_current_index()
     if selected_index < YouTubeQueue.size() then
         selected_index = selected_index + 1
-        -- YouTubeQueue.set_current_index(current_index)
         if selected_index > display_offset + display_limit then
             display_offset = display_offset + 1
         end
@@ -243,9 +252,22 @@ local function move_selection_down()
     end
 end
 
+local function play_video_at(idx)
+    local queue = YouTubeQueue.get_video_queue()
+    if idx <= 0 or idx > #queue then
+        mp.osd_message("Invalid video index")
+        return nil
+    end
+    YouTubeQueue.set_current_index(idx)
+    selected_index = index
+    mp.set_property_number("playlist-pos", index - 1) -- zero-based index
+    return current_video
+end
+
+
 local function play_selected_video()
     -- local current_index = YouTubeQueue.get_current_index()
-    local video = YouTubeQueue.play_video_at(selected_index)
+    local video = play_video_at(selected_index)
     YouTubeQueue.print_queue(MSG_DURATION - 0.5)
     sleep(MSG_DURATION)
     print_video_name(video, MSG_DURATION)
@@ -280,9 +302,9 @@ local function add_to_queue()
     if YouTubeQueue.is_in_queue(url) then
         mp.osd_message("Video already in queue.")
         return
-    elseif not is_valid_ytdlp_url(url) then
-        mp.osd_message("Invalid URL.")
-        return
+        -- elseif not is_valid_ytdlp_url(url) then
+        --     mp.osd_message("Invalid URL.")
+        --     return
     end
     local name = get_video_name(url)
     local channel_url = get_channel_url(url)
