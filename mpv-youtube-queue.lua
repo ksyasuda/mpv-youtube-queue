@@ -23,6 +23,8 @@ local current_video = nil
 local index = 0
 local selected_index = 1
 local MSG_DURATION = 1.5
+local styleOn = mp.get_property("osd-ass-cc/0")
+local styleOff = mp.get_property("osd-ass-cc/1")
 
 local options = {
     add_to_queue = "ctrl+a",
@@ -39,9 +41,8 @@ local options = {
     clipboard_command = "xclip -o",
     display_limit = 6,
     cursor_icon = " ",
-    -- cursor_icon = " ",
     font_size = 24,
-    font_name = "JetBrains Mono Nerd Font",
+    font_name = "JetBrains Mono",
     selected_color = "F993BD",
     cursor_color = "FDE98B"
 }
@@ -50,9 +51,6 @@ mp.options.read_options(options, "mpv-youtube-queue")
 
 local display_limit = options.display_limit
 local display_offset = 0
-
-local styleOn = mp.get_property("osd-ass-cc/0")
-local styleOff = mp.get_property("osd-ass-cc/1")
 
 -- HELPERS {{{
 
@@ -199,14 +197,20 @@ function YouTubeQueue.print_queue(duration)
             local prefix = (i == selected_index) and
                 styleOn ..
                 "{\\c&" .. options.cursor_color .. "&}" .. options.cursor_icon .. "{\\c&BFBFBF&\b0}" .. styleOff
-                or "   "
+                or
+                "   "
             if i == current_index then
                 message = message ..
                     prefix ..
                     styleOn .. "{\b1\\c&" .. options.selected_color .. "&}" .. i .. ". " .. video_queue[i].name ..
-                    "\n" .. "{\\c&BFBFBF&\b0}" .. styleOff
+                    "{\\c&BFBFBF&\b0}" .. styleOff .. "\n"
+            elseif i == 2 then
+                message = message ..
+                    prefix .. styleOn .. "{\\c&BFBFBF&\b0}" .. styleOff .. i .. ". " .. video_queue[i].name ..
+                    "\n"
             else
-                message = message .. prefix .. i .. ". " .. video_queue[i].name ..
+                message = message ..
+                    prefix .. styleOn .. "{\\c&BFBFBF&\b0}" .. styleOff .. i .. ". " .. video_queue[i].name ..
                     "\n"
             end
         end
@@ -295,10 +299,6 @@ local function add_to_queue()
         mp.osd_message("Nothing found in the clipboard.")
         return
     end
-    if not string.match(url, "^https://www.youtube.com") then
-        mp.osd_message("Not a YouTube URL.")
-        return
-    end
     if YouTubeQueue.is_in_queue(url) then
         mp.osd_message("Video already in queue.")
         return
@@ -307,7 +307,16 @@ local function add_to_queue()
         --     return
     end
     local name = get_video_name(url)
+    if not name then
+        mp.osd_message("Error getting video name.")
+        return
+    end
     local channel_url = get_channel_url(url)
+    if not channel_url then
+        mp.osd_message("Error getting channel URL.")
+        return
+    end
+
     YouTubeQueue.add_to_queue({
         url = url,
         name = name,
