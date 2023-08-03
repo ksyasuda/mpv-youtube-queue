@@ -299,13 +299,14 @@ local function play_next_in_queue()
     local next_video = YouTubeQueue.next_in_queue()
     if not next_video then return end
     local next_video_url = next_video.url
+    local current_index = YouTubeQueue.get_current_index()
     if YouTubeQueue.size() > 1 then
-        mp.set_property_number("playlist-pos",
-            YouTubeQueue.get_current_index() - 1)
+        mp.set_property_number("playlist-pos", current_index - 1)
     else
         mp.commandv("loadfile", next_video_url, "replace")
     end
     print_video_name(next_video, MSG_DURATION)
+    selected_index = current_index
     sleep(MSG_DURATION)
 end
 
@@ -350,11 +351,13 @@ end
 -- play the previous video in the queue
 local function play_previous_video()
     local previous_video = YouTubeQueue.prev_in_queue()
+    local current_index = YouTubeQueue.get_current_index()
     if not previous_video then
         print_osd_message("No previous video available.", MSG_DURATION, colors.error)
         return
     end
-    mp.set_property_number("playlist-pos", YouTubeQueue.get_current_index() - 1)
+    mp.set_property_number("playlist-pos", current_index - 1)
+    selected_index = current_index
     print_video_name(previous_video, MSG_DURATION)
     sleep(MSG_DURATION)
 end
