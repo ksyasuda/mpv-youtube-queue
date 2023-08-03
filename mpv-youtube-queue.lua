@@ -47,7 +47,8 @@ local colors = {
     error = "676EFF",
     text = "BFBFBF",
     selected_color = "F993BD",
-    cursor = "FDE98B"
+    cursor = "FDE98B",
+    reset = "{\\c&BFBFBF&}"
 }
 
 mp.options.read_options(options, "mpv-youtube-queue")
@@ -203,22 +204,15 @@ function YouTubeQueue.print_queue(duration)
         for i = start_index, end_index do
             local prefix = (i == selected_index) and styleOn .. "{\\c&" ..
                 colors.cursor .. "&}" .. options.cursor_icon ..
-                " " .. "{\\c&" .. colors.text .. "&}" .. styleOff or
-                "   "
+                " " .. colors.reset .. styleOff or "    "
             if i == current_index then
-                message = message .. prefix .. styleOn .. "{\b1\\c&" ..
+                message = message .. prefix .. styleOn .. "{\\b1\\c&" ..
                     colors.selected_color .. "&}" .. i .. ". " ..
-                    video_queue[i].name .. "{\\c&" .. colors.text ..
-                    "&\b0}" .. styleOff .. "\n"
-            elseif i == 2 then
-                message =
-                    message .. prefix .. styleOn .. "{\\c&" .. colors.text ..
-                    "&\b0}" .. styleOff .. i .. ". " .. video_queue[i].name ..
-                    "\n"
+                    video_queue[i].name .. "{\\b0}" .. colors.reset ..
+                    styleOff .. "\n"
             else
-                message =
-                    message .. prefix .. styleOn .. "{\\c&" .. colors.text ..
-                    "&\b0}" .. styleOff .. i .. ". " .. video_queue[i].name ..
+                message = message .. prefix .. styleOn .. colors.reset ..
+                    styleOff .. i .. ". " .. video_queue[i].name ..
                     "\n"
             end
         end
