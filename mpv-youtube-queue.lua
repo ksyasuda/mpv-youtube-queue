@@ -54,14 +54,16 @@ local colors = {
 }
 
 local style = {
-    error = "{\\c&" .. colors.error .. "&}",
-    selected = "{\\c&" .. colors.selected .. "&}",
-    hover_selected = "{\\c&" .. colors.hover_selected .. "&}",
+    error = "{\\c&" .. colors.error .. "&\\alpha&H00&}",
+    selected = "{\\c&" .. colors.selected .. "&\\alpha&H40&}",
+    hover_selected = "{\\c&" .. colors.hover_selected .. "&\\alpha&H20&}",
     cursor = "{\\c&" .. colors.cursor .. "&}",
     reset = "{\\c&" .. colors.text .. "&}",
-    header = "{\\c&" .. colors.header .. "&}",
+    header = "{\\c&" .. colors.header .. "}",
     hover = "{\\c&" .. colors.hover .. "&}",
-    font = "{\\fn" .. options.font_name .. "\\fs" .. options.font_size .. "}"
+    font = "{\\fn" .. options.font_name .. "\\fs" .. options.font_size ..
+        "\\alpha&H80&}",
+    notransparency = "{\\alpha&H00&}"
 }
 
 mp.options.read_options(options, "mpv-youtube-queue")
@@ -215,12 +217,12 @@ function YouTubeQueue.print_queue(duration)
 
         local message =
             styleOn .. style.header .. "{\\fn" .. options.font_name .. "\\fs" ..
-            options.font_size * 2 .. "}" .. "MPV-YOUTUBE-QUEUE" ..
+            options.font_size * 1.5 .. "\\b1}" .. "MPV-YOUTUBE-QUEUE{\\b0}" ..
             style.reset .. style.font .. "\n"
         for i = start_index, end_index do
             local prefix = (i == selected_index) and style.cursor ..
-                options.cursor_icon .. " " .. style.reset or
-                "    "
+                style.notransparency .. options.cursor_icon ..
+                " " .. style.reset or "    "
             if i == current_index and i == selected_index then
                 message =
                     message .. prefix .. style.hover_selected .. i .. ". " ..
@@ -333,13 +335,13 @@ local function add_to_queue()
         --     return
     end
     local name = get_video_name(url)
-    if not name then
+    if not name or name == "" then
         print_osd_message("Error getting video name.", MSG_DURATION,
             colors.error)
         return
     end
     local channel_url = get_channel_url(url)
-    if not channel_url then
+    if not channel_url or channel_url == "" then
         print_osd_message("Error getting channel URL.", MSG_DURATION,
             colors.error)
         return
