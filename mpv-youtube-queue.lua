@@ -43,7 +43,8 @@ local options = {
     font_size = 14,
     font_name = "JetBrains Mono",
     download_quality = "720p",
-    download_directory = "~/Videos/YouTube"
+    download_directory = "~/videos/YouTube",
+    downloader = "curl"
 }
 
 local colors = {
@@ -422,30 +423,33 @@ local function download_current_video()
         local v = current_video
         local q = o.download_quality:sub(1, -2)
         local command = 'yt-dlp -f \'bestvideo[height<=' .. q ..
-            ']+bestaudio/best[height<=' .. q ..
-            ']\' --newline -o "' ..
+            ']+bestaudio/best[height<=' .. q .. ']\' -o "' ..
             expanduser(o.download_directory) .. '/' ..
             v.channel_name .. '/' .. v.video_name ..
-            '.%(ext)s" ' .. v.video_url
+            '.%(ext)s" ' .. '--downloader ' .. o.downloader ..
+            ' ' .. v.video_url
 
         -- Run the download command
         local handle = io.popen(command)
         if not handle then
-            mp.osd_message("Error starting download.")
+            print_osd_message("Error starting download.", MSG_DURATION,
+                style.error)
             return
         end
+        print_osd_message("Starting download for " .. v.video_name, MSG_DURATION)
         local result = handle:read("*a")
+        handle:close()
         if not result then
-            mp.osd_message("Error starting download.")
+            print_osd_message("Error starting download.", MSG_DURATION,
+                style.error)
             return
         end
-        handle:close()
 
-        mp.msg.log("info", "RESULTS: " .. result)
         if result then
-            print_osd_message("Downloading " .. v.video_name, MSG_DURATION)
+            print_osd_message("Finished downloading " .. v.video_name,
+                MSG_DURATION)
         else
-            print_osd_message("Error starting download for " .. v.video_name,
+            print_osd_message("Error downloading " .. v.video_name,
                 MSG_DURATION, style.error)
         end
     else
