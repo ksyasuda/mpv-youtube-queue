@@ -80,17 +80,15 @@ local display_offset = 0
 -- run sleep shell command for n seconds
 local function sleep(n) os.execute("sleep " .. tonumber(n)) end
 
-local function print_osd_message(message, duration, color)
-    if not color then color = colors.text end
-    mp.osd_message(styleOn .. "{\\c&" .. color .. "&}" .. message .. "{\\c&" ..
-        colors.text .. "&}" .. styleOff .. "\n", duration)
+local function print_osd_message(message, duration, s)
+    if not s then s = style.font .. "{" .. notransparent .. "}" end
+    mp.osd_message(styleOn .. s .. message .. style.reset .. styleOff .. "\n",
+        duration)
 end
 
--- print the name of the current video to the OSD
-local function print_video_name(video, duration)
-    if not video then return end
-    if not duration then duration = 2 end
-    print_osd_message('Playing: ' .. video.video_name, duration)
+local function print_current_video()
+    print_osd_message("Playing: " .. current_video.video_name .. ' by ' ..
+        current_video.video_name, 3)
 end
 
 local function get_video_info(url)
@@ -144,7 +142,7 @@ function YouTubeQueue.get_current_video() return current_video end
 
 function YouTubeQueue.get_video_at(idx)
     if idx <= 0 or idx > #video_queue then
-        print_osd_message("Invalid video index", MSG_DURATION, colors.error)
+        print_osd_message("Invalid video index", MSG_DURATION, style.error)
         return nil
     end
     return video_queue[idx]
@@ -172,10 +170,8 @@ function YouTubeQueue.prev_in_queue()
         index = index - 1
         selected_index = index
         current_video = video_queue[index]
-    else
-        current_video = video_queue[1]
+        return current_video
     end
-    return current_video
 end
 
 function YouTubeQueue.is_in_queue(url)
@@ -256,7 +252,7 @@ function YouTubeQueue.print_queue(duration)
         mp.osd_message(message, duration)
     else
         print_osd_message("No videos in the queue or history.", duration,
-            colors.error)
+            style.error)
     end
 end
 
@@ -269,7 +265,7 @@ local function get_clipboard_content()
     local handle = io.popen(options.clipboard_command)
     if not handle then
         print_osd_message("Error getting clipboard content", MSG_DURATION,
-            colors.error)
+            style.error)
         return nil
     end
     local result = handle:read("*a")
@@ -300,7 +296,7 @@ end
 local function play_video_at(idx)
     local queue = YouTubeQueue.get_video_queue()
     if idx <= 0 or idx > #queue then
-        print_osd_message("Invalid video index", MSG_DURATION, colors.error)
+        print_osd_message("Invalid video index", MSG_DURATION, style.error)
         return nil
     end
     YouTubeQueue.set_current_index(idx)
@@ -311,16 +307,20 @@ end
 
 local function play_selected_video()
     -- local current_index = YouTubeQueue.get_current_index()
-    local video = play_video_at(selected_index)
+    play_video_at(selected_index)
     YouTubeQueue.print_queue(MSG_DURATION - 0.5)
     sleep(MSG_DURATION)
-    print_video_name(video, MSG_DURATION)
+    print_current_video()
 end
 
 -- play the next video in the queue
 local function play_next_in_queue()
     local next_video = YouTubeQueue.next_in_queue()
-    if not next_video then return end
+    if not next_video or next_video == "" then
+        print_osd_message("No more videos in the queue.", MSG_DURATION,
+            style.error)
+        return
+    end
     local next_video_url = next_video.url
     local current_index = YouTubeQueue.get_current_index()
     if YouTubeQueue.size() > 1 then
@@ -328,7 +328,7 @@ local function play_next_in_queue()
     else
         mp.commandv("loadfile", next_video_url, "replace")
     end
-    print_video_name(next_video, MSG_DURATION)
+    print_current_video()
     selected_index = current_index
     sleep(MSG_DURATION)
 end
@@ -338,11 +338,11 @@ local function add_to_queue()
     local url = get_clipboard_content()
     if not url then
         print_osd_message("Nothing found in the clipboard.", MSG_DURATION,
-            colors.error)
+            style.error)
         return
     end
     if YouTubeQueue.is_in_queue(url) then
-        print_osd_message("Video already in queue.", MSG_DURATION, colors.error)
+        print_osd_message("Video already in queue.", MSG_DURATION, style.error)
         return
         -- elseif not is_valid_ytdlp_url(url) then
         --     mp.osd_message("Invalid URL.")
@@ -351,8 +351,7 @@ local function add_to_queue()
     local channel_url, channel_name, video_name = get_video_info(url)
     if (not channel_url or not channel_name or not video_name) or
         (channel_url == "" or channel_name == "" or video_name == "") then
-        print_osd_message("Error getting video info.", MSG_DURATION,
-            colors.error)
+        print_osd_message("Error getting video info.", MSG_DURATION, style.error)
         return
     end
 
@@ -373,15 +372,15 @@ end
 -- play the previous video in the queue
 local function play_previous_video()
     local previous_video = YouTubeQueue.prev_in_queue()
-    local current_index = YouTubeQueue.get_current_index()
-    if not previous_video then
+    if not previous_video or previous_video == "" then
         print_osd_message("No previous video available.", MSG_DURATION,
-            colors.error)
+            style.error)
         return
     end
+    local current_index = YouTubeQueue.get_current_index()
     mp.set_property_number("playlist-pos", current_index - 1)
     selected_index = current_index
-    print_video_name(previous_video, MSG_DURATION)
+    print_current_video()
     sleep(MSG_DURATION)
 end
 
@@ -396,11 +395,6 @@ local function open_channel_in_browser()
     open_url_in_browser(current_video.channel_url)
 end
 
-local function print_current_video()
-    print_osd_message(
-        "Currently playing " .. current_video.video_name .. ' by ' ..
-        current_video.video_name, 3)
-end
 -- }}}
 
 -- KEY BINDINGS {{{
