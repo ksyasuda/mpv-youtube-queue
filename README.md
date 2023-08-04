@@ -8,22 +8,20 @@ navigate through the queue, and select a video to play.
 ## Features
 
 - Add YouTube videos to a queue from the clipboard
-- Select a video from the queue to play from an interactive menu,
-  or navigate through the queue with keybinds
-- Open the URL of the currently playing video in a new browser tab.
-- Fetch and display the names of YouTube videos.
-- Print the current contents of the queue
+- Fetch and display the video and channel names of the videos in the queue
+- Select a video to play from the queue with an interactive menu,
+  or navigate through the queue with keyboard shortcuts
+- Open the URL of the currently playing video in a new browser tab
+- Open the channel page of the currently playing video
+- Download the currently playing video
 
 ## Notes
 
 - This script uses the Linux `xclip` utility to read from the clipboard.
-  If you're on macOS or Windows, you'll need to adjust the setting in
-  `mpv-youtube-queue.conf` as described in the [install section](#installation).
+  If you're on macOS or Windows, you'll need to adjust the `clipboard_command`
+  config variable in [mpv-youtube-queue.conf](./mpv-youtube-queue.conf)
 - When adding videos to the queue, the script fetches the video name using
   `yt-dlp`. Ensure you have `yt-dlp` installed and in your PATH.
-- The script maintains its own queue separate from mpv's internal playlist.
-  This means that loading files manually or using the next/previous buttons on
-  the mpv OSC will not affect the queue.
 
 ## Requirements
 
@@ -36,7 +34,7 @@ This script requires the following software to be installed on the system
 
 - Copy the `mpv-youtube-queue.lua` script to your `~~/scripts` directory
 - Optionally copy the `mpv-youtube-queue.conf` to the `~~/script-opts` directory
-  to customize the keybindings
+  to customize the script configuration
 
 ## License
 
