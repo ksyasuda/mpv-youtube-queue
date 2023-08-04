@@ -218,13 +218,13 @@ function YouTubeQueue.update_current_index()
     for i, v in ipairs(video_queue) do
         if v.video_url == current_url then
             index = i
+            selected_index = index
+            current_video = YouTubeQueue.get_video_at(index)
             return
         end
     end
     -- if not found, reset the index
     index = 0
-    selected_index = index
-    current_video = YouTubeQueue.get_video_at(index)
 end
 
 -- Function to be called when the end-file event is triggered
