@@ -39,16 +39,29 @@ local options = {
     clipboard_command = "xclip -o",
     display_limit = 6,
     cursor_icon = "🠺",
-    font_size = 24,
+    font_size = 12,
     font_name = "JetBrains Mono"
 }
 
 local colors = {
     error = "676EFF",
-    text = "BFBFBF",
-    selected_color = "F993BD",
+    selected = "F993BD",
+    hover_selected = "FAA9CA",
     cursor = "FDE98B",
-    reset = "{\\c&BFBFBF&}"
+    header = "8CFAF1",
+    hover = "F2F8F8",
+    text = "BFBFBF"
+}
+
+local style = {
+    error = "{\\c&" .. colors.error .. "&}",
+    selected = "{\\c&" .. colors.selected .. "&}",
+    hover_selected = "{\\c&" .. colors.hover_selected .. "&}",
+    cursor = "{\\c&" .. colors.cursor .. "&}",
+    reset = "{\\c&" .. colors.text .. "&}",
+    header = "{\\c&" .. colors.header .. "&}",
+    hover = "{\\c&" .. colors.hover .. "&}",
+    font = "{\\fn" .. options.font_name .. "\\fs" .. options.font_size .. "}"
 }
 
 mp.options.read_options(options, "mpv-youtube-queue")
@@ -195,27 +208,35 @@ function YouTubeQueue.print_queue(duration)
     local current_index = index
     if not duration then duration = 3 end
     if #video_queue > 0 then
-        local message = ""
         local start_index = math.max(1, selected_index - display_limit / 2)
         local end_index =
             math.min(#video_queue, start_index + display_limit - 1)
         display_offset = start_index - 1
 
+        local message =
+            styleOn .. style.header .. "{\\fn" .. options.font_name .. "\\fs" ..
+            options.font_size * 2 .. "}" .. "MPV-YOUTUBE-QUEUE" ..
+            style.reset .. style.font .. "\n"
         for i = start_index, end_index do
-            local prefix = (i == selected_index) and styleOn .. "{\\c&" ..
-                colors.cursor .. "&}" .. options.cursor_icon ..
-                " " .. colors.reset .. styleOff or "    "
-            if i == current_index then
-                message = message .. prefix .. styleOn .. "{\\b1\\c&" ..
-                    colors.selected_color .. "&}" .. i .. ". " ..
-                    video_queue[i].name .. "{\\b0}" .. colors.reset ..
-                    styleOff .. "\n"
+            local prefix = (i == selected_index) and style.cursor ..
+                options.cursor_icon .. " " .. style.reset or
+                "    "
+            if i == current_index and i == selected_index then
+                message =
+                    message .. prefix .. style.hover_selected .. i .. ". " ..
+                    video_queue[i].name .. style.reset .. "\n"
+            elseif i == current_index then
+                message = message .. prefix .. style.selected .. i .. ". " ..
+                    video_queue[i].name .. style.reset .. "\n"
+            elseif i == selected_index then
+                message = message .. prefix .. style.hover .. i .. ". " ..
+                    video_queue[i].name .. style.reset .. "\n"
             else
-                message = message .. prefix .. styleOn .. colors.reset ..
-                    styleOff .. i .. ". " .. video_queue[i].name ..
-                    "\n"
+                message = message .. prefix .. style.reset .. i .. ". " ..
+                    video_queue[i].name .. style.reset .. "\n"
             end
         end
+        message = message .. styleOff
         mp.osd_message(message, duration)
     else
         print_osd_message("No videos in the queue or history.", duration,
