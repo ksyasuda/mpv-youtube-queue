@@ -228,19 +228,6 @@ function YouTubeQueue.update_current_index()
     index = 0
 end
 
--- Function to be called when the end-file event is triggered
-function YouTubeQueue.on_end_file(event)
-    if event.reason == "eof" then -- The file ended normally
-        YouTubeQueue.update_current_index()
-    end
-end
-
--- Function to be called when the track-changed event is triggered
-function YouTubeQueue.on_track_changed() YouTubeQueue.update_current_index() end
-
--- Function to be called when the playback-restart event is triggered
-function YouTubeQueue.on_playback_restart() YouTubeQueue.update_current_index() end
-
 function YouTubeQueue.print_queue(duration)
     local current_index = index
     if not duration then duration = 3 end
@@ -457,6 +444,19 @@ local function download_current_video()
     end
 end
 
+-- Function to be called when the end-file event is triggered
+local function on_end_file(event)
+    if event.reason == "eof" then -- The file ended normally
+        YouTubeQueue.update_current_index()
+    end
+end
+
+-- Function to be called when the track-changed event is triggered
+local function on_track_changed() YouTubeQueue.update_current_index() end
+
+-- Function to be called when the playback-restart event is triggered
+local function on_playback_restart() YouTubeQueue.update_current_index() end
+
 -- }}}
 
 -- KEY BINDINGS {{{
@@ -481,8 +481,7 @@ mp.add_key_binding(options.open_channel_in_browser, "open_channel_in_browser",
 mp.add_key_binding(options.download_current_video, "download_current_video",
     download_current_video)
 
--- Listen for the file-loaded event
-mp.register_event("end-file", YouTubeQueue.on_end_file)
-mp.register_event("track-changed", YouTubeQueue.on_track_changed)
-mp.register_event("playback-restart", YouTubeQueue.on_playback_restart)
+mp.register_event("end-file", on_end_file)
+mp.register_event("track-changed", on_track_changed)
+mp.register_event("playback-restart", on_playback_restart)
 -- }}}
