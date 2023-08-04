@@ -35,12 +35,15 @@ local options = {
     open_video_in_browser = "ctrl+o",
     open_channel_in_browser = "ctrl+O",
     print_current_video = "ctrl+P",
+    download_current_video = "ctrl+d",
     browser = "firefox",
     clipboard_command = "xclip -o",
     display_limit = 6,
     cursor_icon = "🠺",
     font_size = 14,
-    font_name = "JetBrains Mono"
+    font_name = "JetBrains Mono",
+    download_quality = "720p",
+    download_directory = "~/Videos/YouTube"
 }
 
 local colors = {
@@ -82,6 +85,7 @@ local function sleep(n) os.execute("sleep " .. tonumber(n)) end
 
 local function print_osd_message(message, duration, s)
     if not s then s = style.font .. "{" .. notransparent .. "}" end
+    if not duration then duration = MSG_DURATION end
     mp.osd_message(styleOn .. s .. message .. style.reset .. styleOff .. "\n",
         duration)
 end
@@ -89,6 +93,32 @@ end
 local function print_current_video()
     print_osd_message("Playing: " .. current_video.video_name .. ' by ' ..
         current_video.video_name, 3)
+end
+
+local function expanduser(path)
+    if path:sub(1, 1) == "~" then
+        local home = os.getenv("HOME")
+        if home then
+            return home .. path:sub(2)
+        else
+            return path
+        end
+    else
+        return path
+    end
+end
+
+local function open_url_in_browser(url)
+    local command = options.browser .. " " .. url
+    os.execute(command)
+end
+
+local function open_video_in_browser()
+    open_url_in_browser(current_video.video_url)
+end
+
+local function open_channel_in_browser()
+    open_url_in_browser(current_video.channel_url)
 end
 
 local function get_video_info(url)
@@ -175,7 +205,9 @@ function YouTubeQueue.prev_in_queue()
 end
 
 function YouTubeQueue.is_in_queue(url)
-    for _, v in ipairs(video_queue) do if v.url == url then return true end end
+    for _, v in ipairs(video_queue) do
+        if v.video_url == url then return true end
+    end
     return false
 end
 
@@ -184,7 +216,7 @@ function YouTubeQueue.update_current_index()
     local current_url = mp.get_property("path")
     if #video_queue == 0 then return end
     for i, v in ipairs(video_queue) do
-        if v.url == current_url then
+        if v.video_url == current_url then
             index = i
             return
         end
@@ -321,7 +353,7 @@ local function play_next_in_queue()
             style.error)
         return
     end
-    local next_video_url = next_video.url
+    local next_video_url = next_video.video_url
     local current_index = YouTubeQueue.get_current_index()
     if YouTubeQueue.size() > 1 then
         mp.set_property_number("playlist-pos", current_index - 1)
@@ -356,7 +388,7 @@ local function add_to_queue()
     end
 
     YouTubeQueue.add_to_queue({
-        url = url,
+        video_url = url,
         video_name = video_name,
         channel_url = channel_url,
         channel_name = channel_name
@@ -384,15 +416,41 @@ local function play_previous_video()
     sleep(MSG_DURATION)
 end
 
-local function open_url_in_browser(url)
-    local command = options.browser .. " " .. url
-    os.execute(command)
-end
+local function download_current_video()
+    if current_video and current_video ~= "" then
+        local o = options
+        local v = current_video
+        local q = o.download_quality:sub(1, -2)
+        local command = 'yt-dlp -f \'bestvideo[height<=' .. q ..
+            ']+bestaudio/best[height<=' .. q ..
+            ']\' --newline -o "' ..
+            expanduser(o.download_directory) .. '/' ..
+            v.channel_name .. '/' .. v.video_name ..
+            '.%(ext)s" ' .. v.video_url
 
-local function open_video_in_browser() open_url_in_browser(current_video.url) end
+        -- Run the download command
+        local handle = io.popen(command)
+        if not handle then
+            mp.osd_message("Error starting download.")
+            return
+        end
+        local result = handle:read("*a")
+        if not result then
+            mp.osd_message("Error starting download.")
+            return
+        end
+        handle:close()
 
-local function open_channel_in_browser()
-    open_url_in_browser(current_video.channel_url)
+        mp.msg.log("info", "RESULTS: " .. result)
+        if result then
+            print_osd_message("Downloading " .. v.video_name, MSG_DURATION)
+        else
+            print_osd_message("Error starting download for " .. v.video_name,
+                MSG_DURATION, style.error)
+        end
+    else
+        print_osd_message("No video to download.", MSG_DURATION, style.error)
+    end
 end
 
 -- }}}
@@ -416,6 +474,8 @@ mp.add_key_binding(options.print_current_video, "print_current_video",
     print_current_video)
 mp.add_key_binding(options.open_channel_in_browser, "open_channel_in_browser",
     open_channel_in_browser)
+mp.add_key_binding(options.download_current_video, "download_current_video",
+    download_current_video)
 
 -- Listen for the file-loaded event
 mp.register_event("end-file", YouTubeQueue.on_end_file)
