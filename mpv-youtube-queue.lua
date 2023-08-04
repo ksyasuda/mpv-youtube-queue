@@ -39,7 +39,7 @@ local options = {
     clipboard_command = "xclip -o",
     display_limit = 6,
     cursor_icon = "🠺",
-    font_size = 12,
+    font_size = 14,
     font_name = "JetBrains Mono"
 }
 
@@ -53,17 +53,21 @@ local colors = {
     text = "BFBFBF"
 }
 
+local notransparent = "\\alpha&H00&"
+local semitransparent = "\\alpha&H4D&"
+local transparent = "\\alpha&H73&"
+
 local style = {
-    error = "{\\c&" .. colors.error .. "&\\alpha&H00&}",
-    selected = "{\\c&" .. colors.selected .. "&\\alpha&H40&}",
-    hover_selected = "{\\c&" .. colors.hover_selected .. "&\\alpha&H20&}",
-    cursor = "{\\c&" .. colors.cursor .. "&}",
-    reset = "{\\c&" .. colors.text .. "&}",
-    header = "{\\c&" .. colors.header .. "}",
-    hover = "{\\c&" .. colors.hover .. "&}",
-    font = "{\\fn" .. options.font_name .. "\\fs" .. options.font_size ..
-        "\\alpha&H80&}",
-    notransparency = "{\\alpha&H00&}"
+    error = "{\\c&" .. colors.error .. "&" .. notransparent .. "}",
+    selected = "{\\c&" .. colors.selected .. "&" .. semitransparent .. "}",
+    hover_selected = "{\\c&" .. colors.hover_selected .. "&\\alpha&H33&}",
+    cursor = "{\\c&" .. colors.cursor .. "&" .. notransparent .. "}",
+    reset = "{\\c&" .. colors.text .. "&" .. transparent .. "}",
+    header = "{\\fn" .. options.font_name .. "\\fs" .. options.font_size * 1.5 ..
+        "\\u1\\b1\\c&" .. colors.header .. "&" .. notransparent .. "}",
+    hover = "{\\c&" .. colors.hover .. "&" .. semitransparent .. "}",
+    font = "{\\fn" .. options.font_name .. "\\fs" .. options.font_size .. "{" ..
+        transparent .. "}"
 }
 
 mp.options.read_options(options, "mpv-youtube-queue")
@@ -86,27 +90,29 @@ end
 local function print_video_name(video, duration)
     if not video then return end
     if not duration then duration = 2 end
-    print_osd_message('Playing: ' .. video.name, duration)
+    print_osd_message('Playing: ' .. video.video_name, duration)
 end
 
--- Function to get the video name from a YouTube URL
-local function get_video_name(url)
-    local command = 'yt-dlp --get-title ' .. url
+local function get_video_info(url)
+    local command =
+        'yt-dlp --print channel_url --print uploader --print title --playlist-items 1 ' ..
+        url
     local handle = io.popen(command)
-    if not handle then return nil end
-    local result = handle:read("*a")
-    handle:close()
-    return result:gsub("%s+$", "")
-end
+    if not handle then return nil, nil, nil end
 
--- get the channel url from a video url
-local function get_channel_url(url)
-    local command = 'yt-dlp --print channel_url --playlist-items 1 ' .. url
-    local handle = io.popen(command)
-    if not handle then return nil end
     local result = handle:read("*a")
     handle:close()
-    return result:gsub("%s+$", "")
+
+    -- Split the result into URL, name, and video title
+    local channel_url, channel_name, video_name = result:match(
+        "(.-)\n(.-)\n(.*)")
+
+    -- Remove trailing whitespace
+    if channel_url then channel_url = channel_url:gsub("%s+$", "") end
+    if channel_name then channel_name = channel_name:gsub("%s+$", "") end
+    if video_name then video_name = video_name:gsub("%s+$", "") end
+
+    return channel_url, channel_name, video_name
 end
 
 local function is_valid_ytdlp_url(url)
@@ -216,26 +222,34 @@ function YouTubeQueue.print_queue(duration)
         display_offset = start_index - 1
 
         local message =
-            styleOn .. style.header .. "{\\fn" .. options.font_name .. "\\fs" ..
-            options.font_size * 1.5 .. "\\b1}" .. "MPV-YOUTUBE-QUEUE{\\b0}" ..
+            styleOn .. style.header .. "MPV-YOUTUBE-QUEUE{\\u0\\b0}" ..
             style.reset .. style.font .. "\n"
         for i = start_index, end_index do
             local prefix = (i == selected_index) and style.cursor ..
-                style.notransparency .. options.cursor_icon ..
-                " " .. style.reset or "    "
+                options.cursor_icon .. " " .. style.reset or
+                "    "
             if i == current_index and i == selected_index then
+                mp.msg.log("info", "YES")
                 message =
                     message .. prefix .. style.hover_selected .. i .. ". " ..
-                    video_queue[i].name .. style.reset .. "\n"
+                    video_queue[i].video_name .. " - (" ..
+                    video_queue[i].channel_name .. ")" .. style.reset ..
+                    "\n"
             elseif i == current_index then
                 message = message .. prefix .. style.selected .. i .. ". " ..
-                    video_queue[i].name .. style.reset .. "\n"
+                    video_queue[i].video_name .. " - (" ..
+                    video_queue[i].channel_name .. ")" .. style.reset ..
+                    "\n"
             elseif i == selected_index then
                 message = message .. prefix .. style.hover .. i .. ". " ..
-                    video_queue[i].name .. style.reset .. "\n"
+                    video_queue[i].video_name .. " - (" ..
+                    video_queue[i].channel_name .. ")" .. style.reset ..
+                    "\n"
             else
                 message = message .. prefix .. style.reset .. i .. ". " ..
-                    video_queue[i].name .. style.reset .. "\n"
+                    video_queue[i].video_name .. " - (" ..
+                    video_queue[i].channel_name .. ")" .. style.reset ..
+                    "\n"
             end
         end
         message = message .. styleOff
@@ -334,29 +348,25 @@ local function add_to_queue()
         --     mp.osd_message("Invalid URL.")
         --     return
     end
-    local name = get_video_name(url)
-    if not name or name == "" then
-        print_osd_message("Error getting video name.", MSG_DURATION,
-            colors.error)
-        return
-    end
-    local channel_url = get_channel_url(url)
-    if not channel_url or channel_url == "" then
-        print_osd_message("Error getting channel URL.", MSG_DURATION,
+    local channel_url, channel_name, video_name = get_video_info(url)
+    if (not channel_url or not channel_name or not video_name) or
+        (channel_url == "" or channel_name == "" or video_name == "") then
+        print_osd_message("Error getting video info.", MSG_DURATION,
             colors.error)
         return
     end
 
     YouTubeQueue.add_to_queue({
         url = url,
-        name = name,
-        channel_url = channel_url
+        video_name = video_name,
+        channel_url = channel_url,
+        channel_name = channel_name
     })
     if not YouTubeQueue.get_current_video() then
         play_next_in_queue()
     else
         mp.commandv("loadfile", url, "append-play")
-        print_osd_message("Added " .. name .. " to queue.", MSG_DURATION)
+        print_osd_message("Added " .. video_name .. " to queue.", MSG_DURATION)
     end
 end
 
@@ -387,7 +397,9 @@ local function open_channel_in_browser()
 end
 
 local function print_current_video()
-    print_osd_message("Currently playing " .. current_video.name, 3)
+    print_osd_message(
+        "Currently playing " .. current_video.video_name .. ' by ' ..
+        current_video.video_name, 3)
 end
 -- }}}
 
