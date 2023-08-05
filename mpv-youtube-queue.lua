@@ -21,30 +21,33 @@ local current_video = nil
 local index = 0
 local selected_index = 1
 local MSG_DURATION = 1.5
+local marked_index = nil
 local styleOn = mp.get_property("osd-ass-cc/0")
 local styleOff = mp.get_property("osd-ass-cc/1")
 
 local options = {
     add_to_queue = "ctrl+a",
+    download_current_video = "ctrl+d",
+    move_selection_down = "ctrl+DOWN",
+    move_selection_up = "ctrl+UP",
+    move_video = "ctrl+m",
+    open_channel_in_browser = "ctrl+O",
+    open_video_in_browser = "ctrl+o",
     play_next_in_queue = "ctrl+n",
     play_previous_in_queue = "ctrl+p",
-    print_queue = "ctrl+q",
-    move_selection_up = "ctrl+UP",
-    move_selection_down = "ctrl+DOWN",
     play_selected_video = "ctrl+ENTER",
-    open_video_in_browser = "ctrl+o",
-    open_channel_in_browser = "ctrl+O",
     print_current_video = "ctrl+P",
-    download_current_video = "ctrl+d",
-    browser = "firefox",
+    print_queue = "ctrl+q",
     clipboard_command = "xclip -o",
-    display_limit = 6,
+    browser = "firefox",
     cursor_icon = "🠺",
-    font_size = 14,
-    font_name = "JetBrains Mono",
-    download_quality = "720p",
+    marked_icon = "󰆾",
     download_directory = "~/videos/YouTube",
-    downloader = "curl"
+    downloader = "curl",
+    download_quality = "720p",
+    font_name = "JetBrains Mono",
+    font_size = 14,
+    display_limit = 6
 }
 
 local colors = {
@@ -54,7 +57,8 @@ local colors = {
     cursor = "FDE98B",
     header = "8CFAF1",
     hover = "F2F8F8",
-    text = "BFBFBF"
+    text = "BFBFBF",
+    marked = "C679FF"
 }
 
 local notransparent = "\\alpha&H00&"
@@ -66,6 +70,7 @@ local style = {
     selected = "{\\c&" .. colors.selected .. "&" .. semitransparent .. "}",
     hover_selected = "{\\c&" .. colors.hover_selected .. "&\\alpha&H33&}",
     cursor = "{\\c&" .. colors.cursor .. "&" .. notransparent .. "}",
+    marked = "{\\c&" .. colors.marked .. "&" .. notransparent .. "}",
     reset = "{\\c&" .. colors.text .. "&" .. transparent .. "}",
     header = "{\\fn" .. options.font_name .. "\\fs" .. options.font_size * 1.5 ..
         "\\u1\\b1\\c&" .. colors.header .. "&" .. notransparent .. "}",
@@ -214,8 +219,8 @@ end
 
 -- Function to find the index of the currently playing video
 function YouTubeQueue.update_current_index()
-    local current_url = mp.get_property("path")
     if #video_queue == 0 then return end
+    local current_url = mp.get_property("path")
     for i, v in ipairs(video_queue) do
         if v.video_url == current_url then
             index = i
@@ -226,6 +231,44 @@ function YouTubeQueue.update_current_index()
     end
     -- if not found, reset the index
     index = 0
+end
+
+function YouTubeQueue.mark_and_move_video()
+    if marked_index == nil and selected_index ~= index then
+        -- Mark the currently selected video for moving
+        marked_index = selected_index
+    else
+        -- Move the previously marked video to the selected position
+        YouTubeQueue.reorder_queue(marked_index, selected_index)
+        -- print_osd_message("Video moved to the selected position.", 1.5)
+        marked_index = nil -- Reset the marked index
+    end
+    -- Refresh the queue display
+    YouTubeQueue.print_queue()
+end
+
+function YouTubeQueue.reorder_queue(from_index, to_index)
+    if from_index == to_index or to_index == index then
+        print_osd_message("No changes made.", 1.5)
+        return
+    end
+    -- Check if the provided indices are within the bounds of the video_queue
+    if from_index > 0 and from_index <= #video_queue and to_index > 0 and
+        to_index <= #video_queue then
+        -- Swap the videos between the two provided indices in the video_queue
+        local temp_video = video_queue[from_index]
+        table.remove(video_queue, from_index)
+        table.insert(video_queue, to_index, temp_video)
+
+        -- Swap the videos between the two provided indices in the MPV playlist
+        mp.commandv("playlist-move", from_index - 1, to_index - 1)
+
+        -- Redraw the queue after reordering
+        YouTubeQueue.print_queue()
+    else
+        print_osd_message("Invalid indices for reordering. No changes made.",
+            MSG_DURATION, style.error)
+    end
 end
 
 function YouTubeQueue.print_queue(duration)
@@ -243,29 +286,32 @@ function YouTubeQueue.print_queue(duration)
         for i = start_index, end_index do
             local prefix = (i == selected_index) and style.cursor ..
                 options.cursor_icon .. " " .. style.reset or
-                "    "
+                "   "
             if i == current_index and i == selected_index then
                 mp.msg.log("info", "YES")
                 message =
                     message .. prefix .. style.hover_selected .. i .. ". " ..
                     video_queue[i].video_name .. " - (" ..
-                    video_queue[i].channel_name .. ")" .. style.reset ..
-                    "\n"
+                    video_queue[i].channel_name .. ")" .. style.reset
             elseif i == current_index then
                 message = message .. prefix .. style.selected .. i .. ". " ..
                     video_queue[i].video_name .. " - (" ..
-                    video_queue[i].channel_name .. ")" .. style.reset ..
-                    "\n"
+                    video_queue[i].channel_name .. ")" .. style.reset
             elseif i == selected_index then
                 message = message .. prefix .. style.hover .. i .. ". " ..
                     video_queue[i].video_name .. " - (" ..
-                    video_queue[i].channel_name .. ")" .. style.reset ..
-                    "\n"
+                    video_queue[i].channel_name .. ")" .. style.reset
             else
                 message = message .. prefix .. style.reset .. i .. ". " ..
                     video_queue[i].video_name .. " - (" ..
-                    video_queue[i].channel_name .. ")" .. style.reset ..
-                    "\n"
+                    video_queue[i].channel_name .. ")" .. style.reset
+            end
+            if i == marked_index then
+                message =
+                    message .. " " .. style.marked .. options.marked_icon ..
+                    style.reset .. "\n"
+            else
+                message = message .. "\n"
             end
         end
         message = message .. styleOff
@@ -341,12 +387,9 @@ local function play_next_in_queue()
             style.error)
         return
     end
-    local next_video_url = next_video.video_url
     local current_index = YouTubeQueue.get_current_index()
     if YouTubeQueue.size() > 1 then
         mp.set_property_number("playlist-pos", current_index - 1)
-    else
-        mp.commandv("loadfile", next_video_url, "replace")
     end
     print_current_video()
     selected_index = current_index
@@ -354,12 +397,14 @@ local function play_next_in_queue()
 end
 
 -- add the video to the queue from the clipboard
-local function add_to_queue()
-    local url = get_clipboard_content()
-    if not url then
-        print_osd_message("Nothing found in the clipboard.", MSG_DURATION,
-            style.error)
-        return
+local function add_to_queue(url)
+    if not url or url == "" then
+        url = get_clipboard_content()
+        if not url then
+            print_osd_message("Nothing found in the clipboard.", MSG_DURATION,
+                style.error)
+            return
+        end
     end
     if YouTubeQueue.is_in_queue(url) then
         print_osd_message("Video already in queue.", MSG_DURATION, style.error)
@@ -371,16 +416,17 @@ local function add_to_queue()
     local channel_url, channel_name, video_name = get_video_info(url)
     if (not channel_url or not channel_name or not video_name) or
         (channel_url == "" or channel_name == "" or video_name == "") then
-        print_osd_message("Error getting video info.", MSG_DURATION, style.error)
+        -- print_osd_message("Error getting video info.", MSG_DURATION, style.error)
         return
     end
 
-    YouTubeQueue.add_to_queue({
+    local video = {
         video_url = url,
         video_name = video_name,
         channel_url = channel_url,
         channel_name = channel_name
-    })
+    }
+    YouTubeQueue.add_to_queue(video)
     if not YouTubeQueue.get_current_video() then
         play_next_in_queue()
     else
@@ -455,7 +501,16 @@ end
 local function on_track_changed() YouTubeQueue.update_current_index() end
 
 -- Function to be called when the playback-restart event is triggered
-local function on_playback_restart() YouTubeQueue.update_current_index() end
+local function on_playback_restart()
+    local playlist_size = mp.get_property_number("playlist-count", 0)
+    mp.msg.log("info", "playlist size: " .. playlist_size)
+    if playlist_size > 1 then
+        YouTubeQueue.update_current_index()
+    else
+        local url = mp.get_property("path")
+        add_to_queue(url)
+    end
+end
 
 -- }}}
 
@@ -480,6 +535,8 @@ mp.add_key_binding(options.open_channel_in_browser, "open_channel_in_browser",
     open_channel_in_browser)
 mp.add_key_binding(options.download_current_video, "download_current_video",
     download_current_video)
+mp.add_key_binding(options.move_video, "move_selection",
+    YouTubeQueue.mark_and_move_video)
 
 mp.register_event("end-file", on_end_file)
 mp.register_event("track-changed", on_track_changed)
