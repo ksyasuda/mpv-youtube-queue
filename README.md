@@ -11,6 +11,7 @@ navigate through the queue, and select a video to play.
 - Fetch and display the video and channel names of the videos in the queue
 - Select a video to play from the queue with an interactive menu,
   or navigate through the queue with keyboard shortcuts
+- Edit the order of videos in the queue
 - Open the URL of the currently playing video in a new browser tab
 - Open the channel page of the currently playing video
 - Download the currently playing video
@@ -33,8 +34,43 @@ This script requires the following software to be installed on the system
 ## Installation
 
 - Copy the `mpv-youtube-queue.lua` script to your `~~/scripts` directory
+  (`~/.config/mpv` on Linux)
 - Optionally copy the `mpv-youtube-queue.conf` to the `~~/script-opts` directory
-  to customize the script configuration
+  to customize the script configuration as described in the next section
+
+## Configuration
+
+### Default Keybindings
+
+- `add_to_queue - ctrl+a`: Add a video in the clipboard to the queue
+- `download_current_video - ctrl+d`: Download the currently playing video
+- `move_cursor_down - ctrl+DOWN`:N - Move the cursor down one row in the queue
+- `move_cursor_u - ctrl+UP`- Move the cursor up one row in the queue
+- `move_video - ctrl+m`: Mark/move the selected video in the queue
+- `open_channel_in_browser - ctrl+O`: Open the channel page for the currently
+  playing video in the browser
+- `open_video_in_browser - ctrl+o`: Open the currently playing video in the browser
+- `play_next_in_queue - ctrl+n`: Play the next video in the queue
+- `play_previous_in_queue - ctrl+p`: Play the previous video in the queue
+- `print_current_video - ctrl+P`: Print the name and channel of the currently
+  playing video to the OSD
+- `print_queue - ctrl+q`: Print the contents of the queue to the OSD
+
+### Default Option
+
+- `clipboard_command - xclip -o`: The command to use to get the contents of the clipboard
+- `browser - firefox`: The browser to use when opening a video or channel page
+- `cursor_icon - ➤`: The icon to use for the cursor
+- `marked_icon - ⇅`: The icon to use to mark a video as ready to be moved in
+  the queue
+- `download_directory ~/videos/YouTube`: The directory to use when downloading
+  a video
+- `downloader - curl`: The name of the program to use to download the video
+- `download_quality 720p`: The maximum download quality
+- `font_name - JetBrains Mono`: The name of the font to use
+- `font_size - 14`: Size of the font
+- `display_limit - 6`: The maximum amount of videos to show on the OSD at once
+- `show_errors - no`: Show error messages on the OSD
 
 ## License
 
