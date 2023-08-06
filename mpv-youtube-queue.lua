@@ -28,8 +28,8 @@ local styleOff = mp.get_property("osd-ass-cc/1")
 local options = {
     add_to_queue = "ctrl+a",
     download_current_video = "ctrl+d",
-    move_selection_down = "ctrl+DOWN",
-    move_selection_up = "ctrl+UP",
+    move_cursor_down = "ctrl+DOWN",
+    move_cursor_up = "ctrl+UP",
     move_video = "ctrl+m",
     open_channel_in_browser = "ctrl+O",
     open_video_in_browser = "ctrl+o",
@@ -334,7 +334,7 @@ function YouTubeQueue.print_queue(duration)
     end
 end
 
-function YouTubeQueue.move_selection_up()
+function YouTubeQueue.move_cursor_up()
     if selected_index > 1 then
         selected_index = selected_index - 1
         if selected_index < display_offset + 1 then
@@ -344,7 +344,7 @@ function YouTubeQueue.move_selection_up()
     end
 end
 
-function YouTubeQueue.move_selection_down()
+function YouTubeQueue.move_cursor_down()
     if selected_index < YouTubeQueue.size() then
         selected_index = selected_index + 1
         if selected_index > display_offset + display_limit then
@@ -526,10 +526,10 @@ mp.add_key_binding(options.play_next_in_queue, "play_next_in_queue",
 mp.add_key_binding(options.play_previous_in_queue, "play_previous_video",
     YouTubeQueue.play_previous_video)
 mp.add_key_binding(options.print_queue, "print_queue", YouTubeQueue.print_queue)
-mp.add_key_binding(options.move_selection_up, "move_selection_up",
-    YouTubeQueue.move_selection_up)
-mp.add_key_binding(options.move_selection_down, "move_selection_down",
-    YouTubeQueue.move_selection_down)
+mp.add_key_binding(options.move_cursor_up, "move_cursor_up",
+    YouTubeQueue.move_cursor_up)
+mp.add_key_binding(options.move_cursor_down, "move_cursor_down",
+    YouTubeQueue.move_cursor_down)
 mp.add_key_binding(options.play_selected_video, "play_selected_video",
     YouTubeQueue.play_selected_video)
 mp.add_key_binding(options.open_video_in_browser, "open_video_in_browser",
@@ -540,7 +540,7 @@ mp.add_key_binding(options.open_channel_in_browser, "open_channel_in_browser",
     open_channel_in_browser)
 mp.add_key_binding(options.download_current_video, "download_current_video",
     YouTubeQueue.download_current_video)
-mp.add_key_binding(options.move_video, "move_selection",
+mp.add_key_binding(options.move_video, "move_video",
     YouTubeQueue.mark_and_move_video)
 
 mp.register_event("end-file", on_end_file)
