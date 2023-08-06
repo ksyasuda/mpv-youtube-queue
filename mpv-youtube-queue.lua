@@ -50,6 +50,8 @@ local options = {
     display_limit = 6
 }
 
+mp.options.read_options(options, "mpv-youtube-queue")
+
 local colors = {
     error = "676EFF",
     selected = "F993BD",
@@ -78,8 +80,6 @@ local style = {
     font = "{\\fn" .. options.font_name .. "\\fs" .. options.font_size .. "{" ..
         transparent .. "}"
 }
-
-mp.options.read_options(options, "mpv-youtube-queue")
 
 local display_limit = options.display_limit
 local display_offset = 0
