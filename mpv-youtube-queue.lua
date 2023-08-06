@@ -90,15 +90,16 @@ local display_offset = 0
 local function sleep(n) os.execute("sleep " .. tonumber(n)) end
 
 local function print_osd_message(message, duration, s)
-    if not s then s = style.font .. "{" .. notransparent .. "}" end
-    if not duration then duration = MSG_DURATION end
+    if s == nil then s = style.font .. "{" .. notransparent .. "}" end
+    if duration == nil then duration = MSG_DURATION end
     mp.osd_message(styleOn .. s .. message .. style.reset .. styleOff .. "\n",
         duration)
 end
 
 local function print_current_video()
-    print_osd_message("Playing: " .. current_video.video_name .. ' by ' ..
-        current_video.video_name, 3)
+    local current = YouTubeQueue.get_current_video()
+    print_osd_message("Playing: " .. current.video_name .. ' by ' ..
+        current.channel_name, 3)
 end
 
 local function expanduser(path)
@@ -120,11 +121,11 @@ local function open_url_in_browser(url)
 end
 
 local function open_video_in_browser()
-    open_url_in_browser(current_video.video_url)
+    open_url_in_browser(YouTubeQueue.get_current_video().video_url)
 end
 
 local function open_channel_in_browser()
-    open_url_in_browser(current_video.channel_url)
+    open_url_in_browser(YouTubeQueue.get_current_video().channel_url)
 end
 
 local function get_video_info(url)
@@ -132,7 +133,7 @@ local function get_video_info(url)
         'yt-dlp --print channel_url --print uploader --print title --playlist-items 1 ' ..
         url
     local handle = io.popen(command)
-    if not handle then return nil, nil, nil end
+    if handle == nil then return nil, nil, nil end
 
     local result = handle:read("*a")
     handle:close()
@@ -142,22 +143,22 @@ local function get_video_info(url)
         "(.-)\n(.-)\n(.*)")
 
     -- Remove trailing whitespace
-    if channel_url then channel_url = channel_url:gsub("%s+$", "") end
-    if channel_name then channel_name = channel_name:gsub("%s+$", "") end
-    if video_name then video_name = video_name:gsub("%s+$", "") end
+    if channel_url ~= nil then channel_url = channel_url:gsub("%s+$", "") end
+    if channel_name ~= nil then channel_name = channel_name:gsub("%s+$", "") end
+    if video_name ~= nil then video_name = video_name:gsub("%s+$", "") end
 
     return channel_url, channel_name, video_name
 end
 
-local function is_valid_ytdlp_url(url)
-    local command = 'yt-dlp --simulate \'' .. url .. '\' >/dev/null 2>&1'
-    local handle = io.popen(command .. "; echo $?")
-    if not handle then return false end
-    local result = handle:read("*a")
-    if not result then return false end
-    handle:close()
-    return result:gsub("%s+$", "") == "0"
-end
+-- local function is_valid_ytdlp_url(url)
+--     local command = 'yt-dlp --simulate \'' .. url .. '\' >/dev/null 2>&1'
+--     local handle = io.popen(command .. "; echo $?")
+--     if handle == nil then return false end
+--     local result = handle:read("*a")
+--     if result == nil then return false end
+--     handle:close()
+--     return result:gsub("%s+$", "") == "0"
+-- end
 
 -- }}}
 
@@ -187,9 +188,6 @@ end
 -- }}}
 
 -- QUEUE FUNCTIONS {{{
-
-function YouTubeQueue.add_to_queue(video) table.insert(video_queue, video) end
-
 -- Function to get the next video in the queue
 -- Returns nil if there are no videos in the queue
 function YouTubeQueue.next_in_queue()
@@ -273,7 +271,7 @@ end
 
 function YouTubeQueue.print_queue(duration)
     local current_index = index
-    if not duration then duration = 3 end
+    if duration == nil then duration = 3 end
     if #video_queue > 0 then
         local start_index = math.max(1, selected_index - display_limit / 2)
         local end_index =
@@ -288,7 +286,6 @@ function YouTubeQueue.print_queue(duration)
                 options.cursor_icon .. " " .. style.reset or
                 "   "
             if i == current_index and i == selected_index then
-                mp.msg.log("info", "YES")
                 message =
                     message .. prefix .. style.hover_selected .. i .. ". " ..
                     video_queue[i].video_name .. " - (" ..
@@ -322,14 +319,10 @@ function YouTubeQueue.print_queue(duration)
     end
 end
 
--- }}}
-
--- MAIN FUNCTIONS {{{
-
 -- returns the content of the clipboard
-local function get_clipboard_content()
+function YouTubeQueue.get_clipboard_content()
     local handle = io.popen(options.clipboard_command)
-    if not handle then
+    if handle == nil then
         print_osd_message("Error getting clipboard content", MSG_DURATION,
             style.error)
         return nil
@@ -339,7 +332,7 @@ local function get_clipboard_content()
     return result
 end
 
-local function move_selection_up()
+function YouTubeQueue.move_selection_up()
     if selected_index > 1 then
         selected_index = selected_index - 1
         if selected_index < display_offset + 1 then
@@ -349,7 +342,7 @@ local function move_selection_up()
     end
 end
 
-local function move_selection_down()
+function YouTubeQueue.move_selection_down()
     if selected_index < YouTubeQueue.size() then
         selected_index = selected_index + 1
         if selected_index > display_offset + display_limit then
@@ -359,7 +352,7 @@ local function move_selection_down()
     end
 end
 
-local function play_video_at(idx)
+function YouTubeQueue.play_video_at(idx)
     local queue = YouTubeQueue.get_video_queue()
     if idx <= 0 or idx > #queue then
         print_osd_message("Invalid video index", MSG_DURATION, style.error)
@@ -371,9 +364,9 @@ local function play_video_at(idx)
     return current_video
 end
 
-local function play_selected_video()
+function YouTubeQueue.play_selected_video()
     -- local current_index = YouTubeQueue.get_current_index()
-    play_video_at(selected_index)
+    YouTubeQueue.play_video_at(selected_index)
     YouTubeQueue.print_queue(MSG_DURATION - 0.5)
     sleep(MSG_DURATION)
     print_current_video()
@@ -382,7 +375,7 @@ end
 -- play the next video in the queue
 local function play_next_in_queue()
     local next_video = YouTubeQueue.next_in_queue()
-    if not next_video or next_video == "" then
+    if next_video == nil then
         print_osd_message("No more videos in the queue.", MSG_DURATION,
             style.error)
         return
@@ -397,24 +390,28 @@ local function play_next_in_queue()
 end
 
 -- add the video to the queue from the clipboard
-local function add_to_queue(url)
-    if not url or url == "" then
-        url = get_clipboard_content()
-        if not url then
+function YouTubeQueue.add_to_queue(url, check_queue)
+    if check_queue == nil then check_queue = true end
+    if url == nil or url == "" then
+        url = YouTubeQueue.get_clipboard_content()
+        if url == nil or url == "" then
             print_osd_message("Nothing found in the clipboard.", MSG_DURATION,
                 style.error)
             return
         end
     end
-    if YouTubeQueue.is_in_queue(url) then
-        print_osd_message("Video already in queue.", MSG_DURATION, style.error)
-        return
-        -- elseif not is_valid_ytdlp_url(url) then
-        --     mp.osd_message("Invalid URL.")
-        --     return
+    if check_queue then
+        if YouTubeQueue.is_in_queue(url) then
+            print_osd_message("Video already in queue.", MSG_DURATION,
+                style.error)
+            return
+            -- elseif not is_valid_ytdlp_url(url) then
+            --     mp.osd_message("Invalid URL.")
+            --     return
+        end
     end
     local channel_url, channel_name, video_name = get_video_info(url)
-    if (not channel_url or not channel_name or not video_name) or
+    if (channel_url == nil or channel_name == nil or video_name == nil) or
         (channel_url == "" or channel_name == "" or video_name == "") then
         -- print_osd_message("Error getting video info.", MSG_DURATION, style.error)
         return
@@ -426,7 +423,7 @@ local function add_to_queue(url)
         channel_url = channel_url,
         channel_name = channel_name
     }
-    YouTubeQueue.add_to_queue(video)
+    table.insert(video_queue, video)
     if not YouTubeQueue.get_current_video() then
         play_next_in_queue()
     else
@@ -436,9 +433,9 @@ local function add_to_queue(url)
 end
 
 -- play the previous video in the queue
-local function play_previous_video()
+function YouTubeQueue.play_previous_video()
     local previous_video = YouTubeQueue.prev_in_queue()
-    if not previous_video or previous_video == "" then
+    if previous_video == nil then
         print_osd_message("No previous video available.", MSG_DURATION,
             style.error)
         return
@@ -450,7 +447,7 @@ local function play_previous_video()
     sleep(MSG_DURATION)
 end
 
-local function download_current_video()
+function YouTubeQueue.download_current_video()
     if current_video and current_video ~= "" then
         local o = options
         local v = current_video
@@ -464,7 +461,7 @@ local function download_current_video()
 
         -- Run the download command
         local handle = io.popen(command)
-        if not handle then
+        if handle == nil then
             print_osd_message("Error starting download.", MSG_DURATION,
                 style.error)
             return
@@ -472,7 +469,7 @@ local function download_current_video()
         print_osd_message("Starting download for " .. v.video_name, MSG_DURATION)
         local result = handle:read("*a")
         handle:close()
-        if not result then
+        if result == nil then
             print_osd_message("Error starting download.", MSG_DURATION,
                 style.error)
             return
@@ -490,6 +487,9 @@ local function download_current_video()
     end
 end
 
+-- }}}
+
+-- LISTENERS {{{
 -- Function to be called when the end-file event is triggered
 local function on_end_file(event)
     if event.reason == "eof" then -- The file ended normally
@@ -503,30 +503,30 @@ local function on_track_changed() YouTubeQueue.update_current_index() end
 -- Function to be called when the playback-restart event is triggered
 local function on_playback_restart()
     local playlist_size = mp.get_property_number("playlist-count", 0)
-    mp.msg.log("info", "playlist size: " .. playlist_size)
     if playlist_size > 1 then
         YouTubeQueue.update_current_index()
     else
         local url = mp.get_property("path")
-        add_to_queue(url)
+        YouTubeQueue.add_to_queue(url, false)
     end
 end
 
 -- }}}
 
 -- KEY BINDINGS {{{
-mp.add_key_binding(options.add_to_queue, "add_to_queue", add_to_queue)
+mp.add_key_binding(options.add_to_queue, "add_to_queue",
+    YouTubeQueue.add_to_queue)
 mp.add_key_binding(options.play_next_in_queue, "play_next_in_queue",
     play_next_in_queue)
 mp.add_key_binding(options.play_previous_in_queue, "play_previous_video",
-    play_previous_video)
+    YouTubeQueue.play_previous_video)
 mp.add_key_binding(options.print_queue, "print_queue", YouTubeQueue.print_queue)
 mp.add_key_binding(options.move_selection_up, "move_selection_up",
-    move_selection_up)
+    YouTubeQueue.move_selection_up)
 mp.add_key_binding(options.move_selection_down, "move_selection_down",
-    move_selection_down)
+    YouTubeQueue.move_selection_down)
 mp.add_key_binding(options.play_selected_video, "play_selected_video",
-    play_selected_video)
+    YouTubeQueue.play_selected_video)
 mp.add_key_binding(options.open_video_in_browser, "open_video_in_browser",
     open_video_in_browser)
 mp.add_key_binding(options.print_current_video, "print_current_video",
@@ -534,11 +534,14 @@ mp.add_key_binding(options.print_current_video, "print_current_video",
 mp.add_key_binding(options.open_channel_in_browser, "open_channel_in_browser",
     open_channel_in_browser)
 mp.add_key_binding(options.download_current_video, "download_current_video",
-    download_current_video)
+    YouTubeQueue.download_current_video)
 mp.add_key_binding(options.move_video, "move_selection",
     YouTubeQueue.mark_and_move_video)
 
 mp.register_event("end-file", on_end_file)
 mp.register_event("track-changed", on_track_changed)
 mp.register_event("playback-restart", on_playback_restart)
+
+mp.register_script_message("add_to_queue", YouTubeQueue.add_to_queue)
+mp.register_script_message("print_queue", YouTubeQueue.print_queue)
 -- }}}
