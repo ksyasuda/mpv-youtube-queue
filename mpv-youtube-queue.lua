@@ -185,6 +185,19 @@ function YouTubeQueue.get_video_at(idx)
     return video_queue[idx]
 end
 
+-- returns the content of the clipboard
+function YouTubeQueue.get_clipboard_content()
+    local handle = io.popen(options.clipboard_command)
+    if handle == nil then
+        print_osd_message("Error getting clipboard content", MSG_DURATION,
+            style.error)
+        return nil
+    end
+    local result = handle:read("*a")
+    handle:close()
+    return result
+end
+
 -- }}}
 
 -- QUEUE FUNCTIONS {{{
@@ -319,19 +332,6 @@ function YouTubeQueue.print_queue(duration)
     end
 end
 
--- returns the content of the clipboard
-function YouTubeQueue.get_clipboard_content()
-    local handle = io.popen(options.clipboard_command)
-    if handle == nil then
-        print_osd_message("Error getting clipboard content", MSG_DURATION,
-            style.error)
-        return nil
-    end
-    local result = handle:read("*a")
-    handle:close()
-    return result
-end
-
 function YouTubeQueue.move_selection_up()
     if selected_index > 1 then
         selected_index = selected_index - 1
@@ -373,7 +373,7 @@ function YouTubeQueue.play_selected_video()
 end
 
 -- play the next video in the queue
-local function play_next_in_queue()
+function YouTubeQueue.play_next_in_queue()
     local next_video = YouTubeQueue.next_in_queue()
     if next_video == nil then
         print_osd_message("No more videos in the queue.", MSG_DURATION,
@@ -425,7 +425,7 @@ function YouTubeQueue.add_to_queue(url, check_queue)
     }
     table.insert(video_queue, video)
     if not YouTubeQueue.get_current_video() then
-        play_next_in_queue()
+        YouTubeQueue.play_next_in_queue()
     else
         mp.commandv("loadfile", url, "append-play")
         print_osd_message("Added " .. video_name .. " to queue.", MSG_DURATION)
@@ -517,7 +517,7 @@ end
 mp.add_key_binding(options.add_to_queue, "add_to_queue",
     YouTubeQueue.add_to_queue)
 mp.add_key_binding(options.play_next_in_queue, "play_next_in_queue",
-    play_next_in_queue)
+    YouTubeQueue.play_next_in_queue)
 mp.add_key_binding(options.play_previous_in_queue, "play_previous_video",
     YouTubeQueue.play_previous_video)
 mp.add_key_binding(options.print_queue, "print_queue", YouTubeQueue.print_queue)
