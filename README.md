@@ -44,7 +44,7 @@ This script requires the following software to be installed on the system
 
 - `add_to_queue - ctrl+a`: Add a video in the clipboard to the queue
 - `download_current_video - ctrl+d`: Download the currently playing video
-- `move_cursor_down - ctrl+DOWN`:N - Move the cursor down one row in the queue
+- `move_cursor_down - ctrl+DOWN`: Move the cursor down one row in the queue
 - `move_cursor_up - ctrl+UP`- Move the cursor up one row in the queue
 - `move_video - ctrl+m`: Mark/move the selected video in the queue
 - `open_channel_in_browser - ctrl+O`: Open the channel page for the currently
@@ -52,6 +52,8 @@ This script requires the following software to be installed on the system
 - `open_video_in_browser - ctrl+o`: Open the currently playing video in the browser
 - `play_next_in_queue - ctrl+n`: Play the next video in the queue
 - `play_previous_in_queue - ctrl+p`: Play the previous video in the queue
+`play_selected_video - ctrl+ENTER`: Play the currently selected video in
+the queue
 - `print_current_video - ctrl+P`: Print the name and channel of the currently
   playing video to the OSD
 - `print_queue - ctrl+q`: Print the contents of the queue to the OSD
@@ -70,7 +72,7 @@ This script requires the following software to be installed on the system
 - `font_name - JetBrains Mono`: The name of the font to use
 - `font_size - 12`: Size of the font
 - `display_limit - 6`: The maximum amount of videos to show on the OSD at once
-- `show_errors - no`: Show error messages on the OSD
+- `show_errors - yes`: Show error messages on the OSD
 
 ## License
 
