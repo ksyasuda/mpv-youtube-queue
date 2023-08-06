@@ -40,9 +40,10 @@ local options = {
     print_queue = "ctrl+q",
     clipboard_command = "xclip -o",
     browser = "firefox",
-    cursor_icon = "🠺",
-    marked_icon = "󰆾",
+    cursor_icon = "➤",
+    marked_icon = "⇅",
     download_directory = "~/videos/YouTube",
+    download_format_str = "%(uploader)s/%(title)s.%(ext)s",
     downloader = "curl",
     download_quality = "720p",
     font_name = "JetBrains Mono",
@@ -105,6 +106,8 @@ local function print_current_video()
 end
 
 local function expanduser(path)
+    -- remove trailing slash if it exists
+    if string.sub(path, -1) == "/" then path = string.sub(path, 1, -2) end
     if path:sub(1, 1) == "~" then
         local home = os.getenv("HOME")
         if home then
@@ -457,12 +460,12 @@ function YouTubeQueue.download_current_video()
         local o = options
         local v = current_video
         local q = o.download_quality:sub(1, -2)
+        local dl_dir = expanduser(o.download_directory)
         local command = 'yt-dlp -f \'bestvideo[height<=' .. q ..
             ']+bestaudio/best[height<=' .. q .. ']\' -o "' ..
-            expanduser(o.download_directory) .. '/' ..
-            v.channel_name .. '/' .. v.video_name ..
-            '.%(ext)s" ' .. '--downloader ' .. o.downloader ..
-            ' ' .. v.video_url
+            dl_dir .. "/" .. options.download_format_str ..
+            '" --downloader ' .. o.downloader .. ' ' ..
+            v.video_url
 
         -- Run the download command
         local handle = io.popen(command)
