@@ -383,6 +383,11 @@ function YouTubeQueue.play_next_in_queue()
     local current_index = YouTubeQueue.get_current_index()
     if YouTubeQueue.size() > 1 then
         mp.set_property_number("playlist-pos", current_index - 1)
+    else
+        local state = mp.get_property("core-idle")
+        if state == "yes" then
+            mp.commandv("loadfile", next_video.video_url, "replace")
+        end
     end
     print_current_video()
     selected_index = current_index
@@ -503,10 +508,12 @@ local function on_track_changed() YouTubeQueue.update_current_index() end
 -- Function to be called when the playback-restart event is triggered
 local function on_playback_restart()
     local playlist_size = mp.get_property_number("playlist-count", 0)
+    local state = mp.get_property("core-idle")
     if playlist_size > 1 then
         YouTubeQueue.update_current_index()
-    else
+    elseif state == "yes" then -- 1 item in playlist and not currently playing
         local url = mp.get_property("path")
+        print_osd_message("CHECKING URL: " .. url, MSG_DURATION)
         YouTubeQueue.add_to_queue(url, false)
     end
 end
