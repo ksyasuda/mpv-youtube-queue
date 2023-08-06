@@ -406,12 +406,14 @@ function YouTubeQueue.add_to_queue(url)
             return
         end
     end
+    if not string.match(url, "^https://www.youtube.com") then
+        print_osd_message("URL is not a valid YouTube URL", MSG_DURATION,
+            style.error)
+        return
+    end
     if YouTubeQueue.is_in_queue(url) then
         print_osd_message("Video already in queue.", MSG_DURATION, style.error)
         return
-        -- elseif not is_valid_ytdlp_url(url) then
-        -- mp.osd_message("Invalid URL.")
-        --     return
     end
     local channel_url, channel_name, video_name = get_video_info(url)
     if (channel_url == nil or channel_name == nil or video_name == nil) or
