@@ -47,7 +47,7 @@ local options = {
     downloader = "curl",
     download_quality = "720p",
     font_name = "JetBrains Mono",
-    font_size = 14,
+    font_size = 12,
     display_limit = 6,
     show_errors = false
 }
@@ -66,8 +66,8 @@ local colors = {
 }
 
 local notransparent = "\\alpha&H00&"
-local semitransparent = "\\alpha&H4D&"
-local transparent = "\\alpha&H73&"
+local semitransparent = "\\alpha&H40&"
+local sortoftransparent = "\\alpha&H59&"
 
 local style = {
     error = "{\\c&" .. colors.error .. "&" .. notransparent .. "}",
@@ -75,12 +75,12 @@ local style = {
     hover_selected = "{\\c&" .. colors.hover_selected .. "&\\alpha&H33&}",
     cursor = "{\\c&" .. colors.cursor .. "&" .. notransparent .. "}",
     marked = "{\\c&" .. colors.marked .. "&" .. notransparent .. "}",
-    reset = "{\\c&" .. colors.text .. "&" .. transparent .. "}",
+    reset = "{\\c&" .. colors.text .. "&" .. sortoftransparent .. "}",
     header = "{\\fn" .. options.font_name .. "\\fs" .. options.font_size * 1.5 ..
         "\\u1\\b1\\c&" .. colors.header .. "&" .. notransparent .. "}",
     hover = "{\\c&" .. colors.hover .. "&" .. semitransparent .. "}",
     font = "{\\fn" .. options.font_name .. "\\fs" .. options.font_size .. "{" ..
-        transparent .. "}"
+        sortoftransparent .. "}"
 }
 
 local display_limit = options.display_limit
@@ -409,11 +409,6 @@ function YouTubeQueue.add_to_queue(url)
             return
         end
     end
-    if not string.match(url, "^https://www.youtube.com") then
-        print_osd_message("URL is not a valid YouTube URL", MSG_DURATION,
-            style.error)
-        return
-    end
     if YouTubeQueue.is_in_queue(url) then
         print_osd_message("Video already in queue.", MSG_DURATION, style.error)
         return
@@ -513,7 +508,7 @@ local function on_playback_restart()
     local playlist_size = mp.get_property_number("playlist-count", 0)
     if playlist_size > 1 then
         YouTubeQueue.update_current_index()
-    else
+    elseif current_video == nil then
         local url = mp.get_property("path")
         YouTubeQueue.add_to_queue(url)
     end

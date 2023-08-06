@@ -45,7 +45,7 @@ This script requires the following software to be installed on the system
 - `add_to_queue - ctrl+a`: Add a video in the clipboard to the queue
 - `download_current_video - ctrl+d`: Download the currently playing video
 - `move_cursor_down - ctrl+DOWN`:N - Move the cursor down one row in the queue
-- `move_cursor_u - ctrl+UP`- Move the cursor up one row in the queue
+- `move_cursor_up - ctrl+UP`- Move the cursor up one row in the queue
 - `move_video - ctrl+m`: Mark/move the selected video in the queue
 - `open_channel_in_browser - ctrl+O`: Open the channel page for the currently
   playing video in the browser
@@ -68,7 +68,7 @@ This script requires the following software to be installed on the system
 - `downloader - curl`: The name of the program to use to download the video
 - `download_quality 720p`: The maximum download quality
 - `font_name - JetBrains Mono`: The name of the font to use
-- `font_size - 14`: Size of the font
+- `font_size - 12`: Size of the font
 - `display_limit - 6`: The maximum amount of videos to show on the OSD at once
 - `show_errors - no`: Show error messages on the OSD
 
