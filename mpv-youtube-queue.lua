@@ -47,7 +47,8 @@ local options = {
     download_quality = "720p",
     font_name = "JetBrains Mono",
     font_size = 14,
-    display_limit = 6
+    display_limit = 6,
+    show_errors = false
 }
 
 local colors = {
@@ -90,6 +91,7 @@ local display_offset = 0
 local function sleep(n) os.execute("sleep " .. tonumber(n)) end
 
 local function print_osd_message(message, duration, s)
+    if s == style.error and not options.show_errors then return end
     if s == nil then s = style.font .. "{" .. notransparent .. "}" end
     if duration == nil then duration = MSG_DURATION end
     mp.osd_message(styleOn .. s .. message .. style.reset .. styleOff .. "\n",
@@ -395,8 +397,7 @@ function YouTubeQueue.play_next_in_queue()
 end
 
 -- add the video to the queue from the clipboard
-function YouTubeQueue.add_to_queue(url, check_queue)
-    if check_queue == nil then check_queue = true end
+function YouTubeQueue.add_to_queue(url)
     if url == nil or url == "" then
         url = YouTubeQueue.get_clipboard_content()
         if url == nil or url == "" then
@@ -405,20 +406,17 @@ function YouTubeQueue.add_to_queue(url, check_queue)
             return
         end
     end
-    if check_queue then
-        if YouTubeQueue.is_in_queue(url) then
-            print_osd_message("Video already in queue.", MSG_DURATION,
-                style.error)
-            return
-            -- elseif not is_valid_ytdlp_url(url) then
-            --     mp.osd_message("Invalid URL.")
-            --     return
-        end
+    if YouTubeQueue.is_in_queue(url) then
+        print_osd_message("Video already in queue.", MSG_DURATION, style.error)
+        return
+        -- elseif not is_valid_ytdlp_url(url) then
+        -- mp.osd_message("Invalid URL.")
+        --     return
     end
     local channel_url, channel_name, video_name = get_video_info(url)
     if (channel_url == nil or channel_name == nil or video_name == nil) or
         (channel_url == "" or channel_name == "" or video_name == "") then
-        -- print_osd_message("Error getting video info.", MSG_DURATION, style.error)
+        print_osd_message("Error getting video info.", MSG_DURATION, style.error)
         return
     end
 
@@ -508,13 +506,11 @@ local function on_track_changed() YouTubeQueue.update_current_index() end
 -- Function to be called when the playback-restart event is triggered
 local function on_playback_restart()
     local playlist_size = mp.get_property_number("playlist-count", 0)
-    local state = mp.get_property("core-idle")
     if playlist_size > 1 then
         YouTubeQueue.update_current_index()
-    elseif state == "yes" then -- 1 item in playlist and not currently playing
+    else
         local url = mp.get_property("path")
-        print_osd_message("CHECKING URL: " .. url, MSG_DURATION)
-        YouTubeQueue.add_to_queue(url, false)
+        YouTubeQueue.add_to_queue(url)
     end
 end
 
