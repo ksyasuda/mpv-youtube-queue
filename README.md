@@ -52,11 +52,13 @@ This script requires the following software to be installed on the system
 - `open_video_in_browser - ctrl+o`: Open the currently playing video in the browser
 - `play_next_in_queue - ctrl+n`: Play the next video in the queue
 - `play_previous_in_queue - ctrl+p`: Play the previous video in the queue
-`play_selected_video - ctrl+ENTER`: Play the currently selected video in
-the queue
+- `play_selected_video - ctrl+ENTER`: Play the currently selected video in
+  the queue
 - `print_current_video - ctrl+P`: Print the name and channel of the currently
   playing video to the OSD
 - `print_queue - ctrl+q`: Print the contents of the queue to the OSD
+- `remove_from_queue - ctrl+x`: Remove the currently selected video from the
+  queue
 
 ### Default Option
 

@@ -38,6 +38,7 @@ local options = {
     play_selected_video = "ctrl+ENTER",
     print_current_video = "ctrl+P",
     print_queue = "ctrl+q",
+    remove_from_queue = "ctrl+x",
     clipboard_command = "xclip -o",
     browser = "firefox",
     cursor_icon = "➤",
@@ -133,28 +134,6 @@ local function open_channel_in_browser()
     open_url_in_browser(YouTubeQueue.get_current_video().channel_url)
 end
 
-local function get_video_info(url)
-    local command =
-        'yt-dlp --print channel_url --print uploader --print title --playlist-items 1 ' ..
-        url
-    local handle = io.popen(command)
-    if handle == nil then return nil, nil, nil end
-
-    local result = handle:read("*a")
-    handle:close()
-
-    -- Split the result into URL, name, and video title
-    local channel_url, channel_name, video_name = result:match(
-        "(.-)\n(.-)\n(.*)")
-
-    -- Remove trailing whitespace
-    if channel_url ~= nil then channel_url = channel_url:gsub("%s+$", "") end
-    if channel_name ~= nil then channel_name = channel_name:gsub("%s+$", "") end
-    if video_name ~= nil then video_name = video_name:gsub("%s+$", "") end
-
-    return channel_url, channel_name, video_name
-end
-
 -- local function is_valid_ytdlp_url(url)
 --     local command = 'yt-dlp --simulate \'' .. url .. '\' >/dev/null 2>&1'
 --     local handle = io.popen(command .. "; echo $?")
@@ -201,6 +180,28 @@ function YouTubeQueue.get_clipboard_content()
     local result = handle:read("*a")
     handle:close()
     return result
+end
+
+function YouTubeQueue.get_video_info(url)
+    local command =
+        'yt-dlp --print channel_url --print uploader --print title --playlist-items 1 ' ..
+        url
+    local handle = io.popen(command)
+    if handle == nil then return nil, nil, nil end
+
+    local result = handle:read("*a")
+    handle:close()
+
+    -- Split the result into URL, name, and video title
+    local channel_url, channel_name, video_name = result:match(
+        "(.-)\n(.-)\n(.*)")
+
+    -- Remove trailing whitespace
+    if channel_url ~= nil then channel_url = channel_url:gsub("%s+$", "") end
+    if channel_name ~= nil then channel_name = channel_name:gsub("%s+$", "") end
+    if video_name ~= nil then video_name = video_name:gsub("%s+$", "") end
+
+    return channel_url, channel_name, video_name
 end
 
 -- }}}
@@ -413,7 +414,8 @@ function YouTubeQueue.add_to_queue(url)
         print_osd_message("Video already in queue.", MSG_DURATION, style.error)
         return
     end
-    local channel_url, channel_name, video_name = get_video_info(url)
+    local channel_url, channel_name, video_name =
+        YouTubeQueue.get_video_info(url)
     if (channel_url == nil or channel_name == nil or video_name == nil) or
         (channel_url == "" or channel_name == "" or video_name == "") then
         print_osd_message("Error getting video info.", MSG_DURATION, style.error)
@@ -490,6 +492,21 @@ function YouTubeQueue.download_current_video()
     end
 end
 
+function YouTubeQueue.remove_from_queue()
+    if index == selected_index then
+        print_osd_message("Cannot remove current video", MSG_DURATION,
+            style.error)
+        return
+    end
+    table.remove(video_queue, selected_index)
+    mp.commandv("playlist-remove", selected_index - 1)
+    print_osd_message("Deleted " .. current_video.video_name .. " from queue.",
+        MSG_DURATION)
+    if selected_index > 1 then selected_index = selected_index - 1 end
+    index = index - 1
+    YouTubeQueue.print_queue()
+end
+
 -- }}}
 
 -- LISTENERS {{{
@@ -540,6 +557,8 @@ mp.add_key_binding(options.download_current_video, "download_current_video",
     YouTubeQueue.download_current_video)
 mp.add_key_binding(options.move_video, "move_video",
     YouTubeQueue.mark_and_move_video)
+mp.add_key_binding(options.remove_from_queue, "delete_video",
+    YouTubeQueue.remove_from_queue)
 
 mp.register_event("end-file", on_end_file)
 mp.register_event("track-changed", on_track_changed)
