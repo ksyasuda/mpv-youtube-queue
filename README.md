@@ -82,7 +82,8 @@ This script requires the following software to be installed on the system
 - `show_errors - yes`: Show error messages on the OSD
 - `ytdlp_output_template - %(uploader)s/%(title)s.%(ext)s`: The [yt-dlp output
   template string](https://github.com/yt-dlp/yt-dlp#output-template)
-  - Full default path is: `~/videos/YouTube/<uploader>/<title>.<ext>`
+  - Full path with the default `download_directory`
+  is: `~/videos/YouTube/<uploader>/<title>.<ext>`
 
 ## License
 
