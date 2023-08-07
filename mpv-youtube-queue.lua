@@ -44,6 +44,7 @@ local options = {
     font_size = 12,
     marked_icon = "⇅",
     show_errors = true,
+    ytdlp_file_format = "mp4",
     ytdlp_output_template = "%(uploader)s/%(title)s.%(ext)s"
 }
 
@@ -462,7 +463,9 @@ function YouTubeQueue.download_video_at(idx)
     local v = video_queue[idx]
     local q = o.download_quality:sub(1, -2)
     local dl_dir = expanduser(o.download_directory)
-    local command = 'yt-dlp -f \'bestvideo[height<=' .. q ..
+    local command = 'yt-dlp -f \'bestvideo[height<=' .. q .. '][ext=' ..
+        options.ytdlp_file_format .. ']+bestaudio/best[height<=' ..
+        q .. ']/bestvideo[height<=' .. q ..
         ']+bestaudio/best[height<=' .. q .. ']\' -o "' .. dl_dir ..
         "/" .. options.ytdlp_output_template ..
         '" --downloader ' .. o.downloader .. ' ' .. v.video_url

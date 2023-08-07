@@ -77,13 +77,14 @@ This script requires the following software to be installed on the system
 - `downloader - curl`: The name of the program to use to download the video
 - `font_name - JetBrains Mono`: The name of the font to use
 - `font_size - 12`: Size of the font
-- `marked_icon - ⇅`: The icon to use to mark a video as ready to be moved
-  in the queue
+- `marked_icon - ⇅`: The icon to use to mark a video as ready to be moved in
+  the queue
 - `show_errors - yes`: Show error messages on the OSD
+- `ytdlp_file_format - mp4`: The preferred file format for downloaded videos
 - `ytdlp_output_template - %(uploader)s/%(title)s.%(ext)s`: The [yt-dlp output
   template string](https://github.com/yt-dlp/yt-dlp#output-template)
   - Full path with the default `download_directory`
-  is: `~/videos/YouTube/<uploader>/<title>.<ext>`
+    is: `~/videos/YouTube/<uploader>/<title>.<ext>`
 
 ## License
 
