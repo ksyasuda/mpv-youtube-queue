@@ -49,6 +49,8 @@ This script requires the following software to be installed on the system
 - `download_current_video - ctrl+d`: Download the currently playing video
 - `download_selected_video - ctrl+D`: Download the currently selected video
   in the queue
+- `move_cursor_down - ctrl+j`: Move the cursor down one row in the queue
+- `move_cursor_up - ctrl+k`- Move the cursor up one row in the queue
 - `move_video - ctrl+m`: Mark/move the selected video in the queue
 - `play_next_in_queue - ctrl+n`: Play the next video in the queue
 - `open_video_in_browser - ctrl+o`: Open the currently playing video in the browser
@@ -60,8 +62,6 @@ This script requires the following software to be installed on the system
 - `print_queue - ctrl+q`: Print the contents of the queue to the OSD
 - `remove_from_queue - ctrl+x`: Remove the currently selected video from the
   queue
-- `move_cursor_up - ctrl+UP`- Move the cursor up one row in the queue
-- `move_cursor_down - ctrl+DOWN`: Move the cursor down one row in the queue
 - `play_selected_video - ctrl+ENTER`: Play the currently selected video in
   the queue
 
@@ -82,7 +82,8 @@ This script requires the following software to be installed on the system
 - `show_errors - yes`: Show error messages on the OSD
 - `ytdlp_output_template - %(uploader)s/%(title)s.%(ext)s`: The [yt-dlp output
   template string](https://github.com/yt-dlp/yt-dlp#output-template)
-  - Full default path is: `~/videos/YouTube/<uploader>/<title>.<ext>`
+  - Full path with the default `download_directory`
+  is: `~/videos/YouTube/<uploader>/<title>.<ext>`
 
 ## License
 

@@ -15,13 +15,6 @@
 -- along with this program.  If not, see <https://www.gnu.org/licenses/>.
 local mp = require 'mp'
 mp.options = require 'mp.options'
-local YouTubeQueue = {}
-local video_queue = {}
-local current_video = nil
-local index = 0
-local selected_index = 1
-local MSG_DURATION = 1.5
-local marked_index = nil
 local styleOn = mp.get_property("osd-ass-cc/0")
 local styleOff = mp.get_property("osd-ass-cc/1")
 
@@ -29,6 +22,8 @@ local options = {
     add_to_queue = "ctrl+a",
     download_current_video = "ctrl+d",
     download_selected_video = "ctrl+D",
+    move_cursor_down = "ctrl+j",
+    move_cursor_up = "ctrl+k",
     move_video = "ctrl+m",
     play_next_in_queue = "ctrl+n",
     open_video_in_browser = "ctrl+o",
@@ -37,8 +32,6 @@ local options = {
     print_current_video = "ctrl+P",
     print_queue = "ctrl+q",
     remove_from_queue = "ctrl+x",
-    move_cursor_up = "ctrl+UP",
-    move_cursor_down = "ctrl+DOWN",
     play_selected_video = "ctrl+ENTER",
     browser = "firefox",
     clipboard_command = "xclip -o",
@@ -50,7 +43,7 @@ local options = {
     font_name = "JetBrains Mono",
     font_size = 12,
     marked_icon = "⇅",
-    show_errors = false,
+    show_errors = true,
     ytdlp_output_template = "%(uploader)s/%(title)s.%(ext)s"
 }
 
@@ -85,8 +78,15 @@ local style = {
         sortoftransparent .. "}"
 }
 
+local YouTubeQueue = {}
+local video_queue = {}
+local MSG_DURATION = 1.5
 local display_limit = options.display_limit
+local index = 0
+local selected_index = 1
 local display_offset = 0
+local marked_index = nil
+local current_video = nil
 
 -- HELPERS {{{
 
@@ -388,6 +388,8 @@ function YouTubeQueue.play_next_in_queue()
         return
     end
     local current_index = YouTubeQueue.get_current_index()
+    -- if the current video is not the first in the queue, then play the video
+    -- else, check if the video is playing and if not play the video with replace
     if YouTubeQueue.size() > 1 then
         mp.set_property_number("playlist-pos", current_index - 1)
     else
@@ -430,6 +432,8 @@ function YouTubeQueue.add_to_queue(url)
         channel_name = channel_name
     }
     table.insert(video_queue, video)
+    -- if the queue was empty, start playing the video
+    -- otherwise, add the video to the playlist
     if not YouTubeQueue.get_current_video() then
         YouTubeQueue.play_next_in_queue()
     else
