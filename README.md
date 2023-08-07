@@ -1,6 +1,6 @@
 # mpv-youtube-queue
 
-A Lua script that implements the YouTube 'Add to Queue' functionality in MPV
+A Lua script that implements the YouTube 'Add to Queue' functionality for MPV
 
 ![mpv-youtube-queue image](.assets/mpv-youtube-queue.png)
 
