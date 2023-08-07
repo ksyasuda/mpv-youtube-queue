@@ -1,7 +1,6 @@
 # mpv-youtube-queue
 
-A Lua script for mpv that allows you to add YouTube videos to a queue,
-navigate through the queue, and select a video to play.
+A Lua script that implements the YouTube 'Add to Queue' functionality in MPV
 
 ![mpv-youtube-queue image](.assets/mpv-youtube-queue.png)
 
@@ -12,8 +11,7 @@ navigate through the queue, and select a video to play.
 - Select a video to play from the queue with an interactive menu,
   or navigate through the queue with keyboard shortcuts
 - Edit the order of videos in the queue
-- Open the URL of the currently playing video in a new browser tab
-- Open the channel page of the currently playing video
+- Open the URL or channel page of the currently playing video in a new browser tab
 - Download the currently playing video
 
 ## Notes
@@ -62,19 +60,21 @@ This script requires the following software to be installed on the system
 
 ### Default Option
 
-- `clipboard_command - xclip -o`: The command to use to get the contents of the clipboard
 - `browser - firefox`: The browser to use when opening a video or channel page
+- `clipboard_command - xclip -o`: The command to use to get the contents of the clipboard
 - `cursor_icon - ➤`: The icon to use for the cursor
-- `marked_icon - ⇅`: The icon to use to mark a video as ready to be moved in
-  the queue
-- `download_directory ~/videos/YouTube`: The directory to use when downloading
-  a video
-- `downloader - curl`: The name of the program to use to download the video
+- `display_limit - 6`: The maximum amount of videos to show on the OSD at once
+- `download_directory - ~/videos/YouTube`: The directory to use when
+  downloading a video
 - `download_quality 720p`: The maximum download quality
+- `downloader - curl`: The name of the program to use to download the video
 - `font_name - JetBrains Mono`: The name of the font to use
 - `font_size - 12`: Size of the font
-- `display_limit - 6`: The maximum amount of videos to show on the OSD at once
+- `marked_icon - ⇅`: The icon to use to mark a video as ready to be moved
+  in the queue
 - `show_errors - yes`: Show error messages on the OSD
+- `ytdlp_output_template - %(uploader)s/%(title)s.%(ext)s`: The [yt-dlp output
+  template string](https://github.com/yt-dlp/yt-dlp#output-template)
 
 ## License
 
