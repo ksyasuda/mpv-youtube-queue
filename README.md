@@ -1,6 +1,10 @@
 # mpv-youtube-queue
 
-A Lua script that implements the YouTube 'Add to Queue' functionality for MPV
+<div align="center">
+
+A Lua script that implements the YouTube 'Add to Queue' functionality for mpv
+
+</div>
 
 ![mpv-youtube-queue image](.assets/mpv-youtube-queue.png)
 
@@ -13,6 +17,7 @@ A Lua script that implements the YouTube 'Add to Queue' functionality for MPV
 - Edit the order of videos in the queue
 - Open the URL or channel page of the currently playing video in a new browser tab
 - Download the currently playing video
+- Download a video in the queue
 
 ## Notes
 
@@ -42,21 +47,23 @@ This script requires the following software to be installed on the system
 
 - `add_to_queue - ctrl+a`: Add a video in the clipboard to the queue
 - `download_current_video - ctrl+d`: Download the currently playing video
-- `move_cursor_down - ctrl+DOWN`: Move the cursor down one row in the queue
-- `move_cursor_up - ctrl+UP`- Move the cursor up one row in the queue
+- `download_selected_video - ctrl+D`: Download the currently selected video
+  in the queue
 - `move_video - ctrl+m`: Mark/move the selected video in the queue
+- `play_next_in_queue - ctrl+n`: Play the next video in the queue
+- `open_video_in_browser - ctrl+o`: Open the currently playing video in the browser
 - `open_channel_in_browser - ctrl+O`: Open the channel page for the currently
   playing video in the browser
-- `open_video_in_browser - ctrl+o`: Open the currently playing video in the browser
-- `play_next_in_queue - ctrl+n`: Play the next video in the queue
 - `play_previous_in_queue - ctrl+p`: Play the previous video in the queue
-- `play_selected_video - ctrl+ENTER`: Play the currently selected video in
-  the queue
 - `print_current_video - ctrl+P`: Print the name and channel of the currently
   playing video to the OSD
 - `print_queue - ctrl+q`: Print the contents of the queue to the OSD
 - `remove_from_queue - ctrl+x`: Remove the currently selected video from the
   queue
+- `move_cursor_up - ctrl+UP`- Move the cursor up one row in the queue
+- `move_cursor_down - ctrl+DOWN`: Move the cursor down one row in the queue
+- `play_selected_video - ctrl+ENTER`: Play the currently selected video in
+  the queue
 
 ### Default Option
 
@@ -75,6 +82,7 @@ This script requires the following software to be installed on the system
 - `show_errors - yes`: Show error messages on the OSD
 - `ytdlp_output_template - %(uploader)s/%(title)s.%(ext)s`: The [yt-dlp output
   template string](https://github.com/yt-dlp/yt-dlp#output-template)
+  - Full default path is: `~/videos/YouTube/<uploader>/<title>.<ext>`
 
 ## License
 
