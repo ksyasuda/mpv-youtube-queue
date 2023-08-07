@@ -28,29 +28,30 @@ local styleOff = mp.get_property("osd-ass-cc/1")
 local options = {
     add_to_queue = "ctrl+a",
     download_current_video = "ctrl+d",
-    move_cursor_down = "ctrl+DOWN",
-    move_cursor_up = "ctrl+UP",
+    download_selected_video = "ctrl+D",
     move_video = "ctrl+m",
-    open_channel_in_browser = "ctrl+O",
-    open_video_in_browser = "ctrl+o",
     play_next_in_queue = "ctrl+n",
+    open_video_in_browser = "ctrl+o",
+    open_channel_in_browser = "ctrl+O",
     play_previous_in_queue = "ctrl+p",
-    play_selected_video = "ctrl+ENTER",
     print_current_video = "ctrl+P",
     print_queue = "ctrl+q",
     remove_from_queue = "ctrl+x",
-    clipboard_command = "xclip -o",
+    move_cursor_up = "ctrl+UP",
+    move_cursor_down = "ctrl+DOWN",
+    play_selected_video = "ctrl+ENTER",
     browser = "firefox",
+    clipboard_command = "xclip -o",
     cursor_icon = "➤",
-    marked_icon = "⇅",
+    display_limit = 6,
     download_directory = "~/videos/YouTube",
-    download_format_str = "%(uploader)s/%(title)s.%(ext)s",
-    downloader = "curl",
     download_quality = "720p",
+    downloader = "curl",
     font_name = "JetBrains Mono",
     font_size = 12,
-    display_limit = 6,
-    show_errors = false
+    marked_icon = "⇅",
+    show_errors = false,
+    ytdlp_output_template = "%(uploader)s/%(title)s.%(ext)s"
 }
 
 mp.options.read_options(options, "mpv-youtube-queue")
@@ -452,44 +453,52 @@ function YouTubeQueue.play_previous_video()
     sleep(MSG_DURATION)
 end
 
+function YouTubeQueue.download_video_at(idx)
+    local o = options
+    local v = video_queue[idx]
+    local q = o.download_quality:sub(1, -2)
+    local dl_dir = expanduser(o.download_directory)
+    local command = 'yt-dlp -f \'bestvideo[height<=' .. q ..
+        ']+bestaudio/best[height<=' .. q .. ']\' -o "' .. dl_dir ..
+        "/" .. options.ytdlp_output_template ..
+        '" --downloader ' .. o.downloader .. ' ' .. v.video_url
+
+    -- Run the download command
+    local handle = io.popen(command)
+    if handle == nil then
+        print_osd_message("Error starting download.", MSG_DURATION, style.error)
+        return
+    end
+    print_osd_message("Starting download for " .. v.video_name, MSG_DURATION)
+    local result = handle:read("*a")
+    handle:close()
+    if result == nil then
+        print_osd_message("Error starting download.", MSG_DURATION, style.error)
+        return
+    end
+
+    if result then
+        print_osd_message("Finished downloading " .. v.video_name, MSG_DURATION)
+    else
+        print_osd_message("Error downloading " .. v.video_name, MSG_DURATION,
+            style.error)
+    end
+end
+
 function YouTubeQueue.download_current_video()
-    if current_video and current_video ~= "" then
-        local o = options
-        local v = current_video
-        local q = o.download_quality:sub(1, -2)
-        local dl_dir = expanduser(o.download_directory)
-        local command = 'yt-dlp -f \'bestvideo[height<=' .. q ..
-            ']+bestaudio/best[height<=' .. q .. ']\' -o "' ..
-            dl_dir .. "/" .. options.download_format_str ..
-            '" --downloader ' .. o.downloader .. ' ' ..
-            v.video_url
-
-        -- Run the download command
-        local handle = io.popen(command)
-        if handle == nil then
-            print_osd_message("Error starting download.", MSG_DURATION,
-                style.error)
-            return
-        end
-        print_osd_message("Starting download for " .. v.video_name, MSG_DURATION)
-        local result = handle:read("*a")
-        handle:close()
-        if result == nil then
-            print_osd_message("Error starting download.", MSG_DURATION,
-                style.error)
-            return
-        end
-
-        if result then
-            print_osd_message("Finished downloading " .. v.video_name,
-                MSG_DURATION)
-        else
-            print_osd_message("Error downloading " .. v.video_name,
-                MSG_DURATION, style.error)
-        end
+    if current_video ~= nil and current_video ~= "" then
+        YouTubeQueue.download_video_at(index)
     else
         print_osd_message("No video to download.", MSG_DURATION, style.error)
     end
+end
+
+function YouTubeQueue.download_selected_video()
+    if selected_index == 1 and current_video == nil then
+        print_osd_message("No video to download.", MSG_DURATION, style.error)
+        return
+    end
+    YouTubeQueue.download_video_at(selected_index)
 end
 
 function YouTubeQueue.remove_from_queue()
@@ -555,6 +564,8 @@ mp.add_key_binding(options.open_channel_in_browser, "open_channel_in_browser",
     open_channel_in_browser)
 mp.add_key_binding(options.download_current_video, "download_current_video",
     YouTubeQueue.download_current_video)
+mp.add_key_binding(options.download_selected_video, "download_selected_video",
+    YouTubeQueue.download_selected_video)
 mp.add_key_binding(options.move_video, "move_video",
     YouTubeQueue.mark_and_move_video)
 mp.add_key_binding(options.remove_from_queue, "delete_video",
