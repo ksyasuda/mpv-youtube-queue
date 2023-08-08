@@ -451,7 +451,7 @@ function YouTubeQueue.add_to_queue(url, update_internal_playlist)
         return
     end
 
-    local video, channel_url, channel_name, video_name, video_url
+    local video, channel_url, channel_name, video_name
     if not is_file(url) then
         channel_url, channel_name, video_name = YouTubeQueue.get_video_info(url)
         url = remove_quotes(url)
@@ -468,9 +468,12 @@ function YouTubeQueue.add_to_queue(url, update_internal_playlist)
             }
         end
     else
-        channel_url, video_name = split_path(video_url)
-        channel_name = "Local file"
-
+        channel_url, video_name = split_path(url)
+        if channel_url == nil or video_name == nil or channel_url == "" or
+            video_name == "" then
+            print_osd_message("Error getting video info.", MSG_DURATION,
+                style.error)
+        end
         video = {
             video_url = url,
             video_name = video_name,
