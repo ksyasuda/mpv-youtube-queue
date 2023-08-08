@@ -10,13 +10,15 @@ A Lua script that implements the YouTube 'Add to Queue' functionality for mpv
 
 ## Features
 
-- Add YouTube videos to a queue from the clipboard
-  - Works with links from any site [supported by yt-dlp](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md "yd-dlp supported sites page")
-- Fetch and display the video and channel names of the videos in the queue
-- An interactive menu to select the video the play, or edit the order of the queue
+- Add videos to a queue from the clipboard
+  - Works with links from any site
+    [supported by yt-dlp](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md "yd-dlp supported sites page")
+- An interactive menu to show the queue, to select a video to play, or to edit the order of the queue
+- Customizable keybindings to interact with the currrently playing video and the
+  queue
 - Open the URL or channel page of the currently playing video in a new browser tab
-- Download the currently playing video
-- Download a video in the queue
+- Download a video in the queue using yt-dlp
+- Customizable download options
 - Integrates with the internal mpv playlist
 
 ## Notes
