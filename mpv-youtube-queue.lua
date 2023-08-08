@@ -370,24 +370,30 @@ function YouTubeQueue.print_queue(duration)
     end
 end
 
-function YouTubeQueue.move_cursor_up()
-    if selected_index > 1 then
-        selected_index = selected_index - 1
-        if selected_index < display_offset + 1 then
-            display_offset = display_offset - 1
-        end
-        YouTubeQueue.print_queue(MSG_DURATION)
+function YouTubeQueue.move_cursor_up(amt)
+    selected_index = selected_index - amt
+    if selected_index < 1 then
+        selected_index = 1
+    elseif selected_index > #video_queue then
+        selected_index = #video_queue
     end
+    if selected_index > 1 and selected_index < display_offset + 1 then
+        display_offset = display_offset - math.abs(selected_index - amt)
+    end
+    YouTubeQueue.print_queue(MSG_DURATION)
 end
 
-function YouTubeQueue.move_cursor_down()
-    if selected_index < YouTubeQueue.size() then
-        selected_index = selected_index + 1
-        if selected_index > display_offset + display_limit then
-            display_offset = display_offset + 1
-        end
-        YouTubeQueue.print_queue(MSG_DURATION)
+function YouTubeQueue.move_cursor_down(amt)
+    selected_index = selected_index + amt
+    if selected_index < 1 then
+        selected_index = 1
+    elseif selected_index > #video_queue then
+        selected_index = #video_queue
     end
+    if selected_index < #video_queue and selected_index > display_offset + display_limit then
+        display_offset = display_offset + math.abs(selected_index - amt)
+    end
+    YouTubeQueue.print_queue(MSG_DURATION)
 end
 
 function YouTubeQueue.play_video_at(idx)
@@ -618,9 +624,9 @@ mp.add_key_binding(options.play_previous_in_queue, "play_previous_video",
     YouTubeQueue.play_previous_video)
 mp.add_key_binding(options.print_queue, "print_queue", YouTubeQueue.print_queue)
 mp.add_key_binding(options.move_cursor_up, "move_cursor_up",
-    YouTubeQueue.move_cursor_up, { repeatable = true })
+    function() YouTubeQueue.move_cursor_up(1) end, { repeatable = true })
 mp.add_key_binding(options.move_cursor_down, "move_cursor_down",
-    YouTubeQueue.move_cursor_down, { repeatable = true })
+    function() YouTubeQueue.move_cursor_down(1) end, { repeatable = true })
 mp.add_key_binding(options.play_selected_video, "play_selected_video",
     YouTubeQueue.play_selected_video)
 mp.add_key_binding(options.open_video_in_browser, "open_video_in_browser",
