@@ -15,6 +15,7 @@
 -- along with this program.  If not, see <https://www.gnu.org/licenses/>.
 local mp = require 'mp'
 mp.options = require 'mp.options'
+local utils = require 'mp.utils'
 local styleOn = mp.get_property("osd-ass-cc/0")
 local styleOff = mp.get_property("osd-ass-cc/1")
 
@@ -105,26 +106,28 @@ local function remove_quotes(s) return string.gsub(s, "'", "") end
 -- run sleep shell command for n seconds
 local function sleep(n) os.execute("sleep " .. tonumber(n)) end
 
--- returns true if the provided path exists and is a file
-local function is_file(filepath)
-    local result = os.execute("test -f " .. surround_with_quotes(filepath))
-    return result
-end
-
--- returns the filename given a path (e.g. /home/user/file.txt -> file.txt)
-local function get_filename(filepath) return string.match(filepath, ".+/(.+)$") end
-
--- return the directory given a path (e.g. /home/user/file.txt -> /home/user)
-local function get_directory(filepath)
-    return surround_with_quotes(string.match(filepath, "(.+)/.+"))
-end
-
 local function print_osd_message(message, duration, s)
     if s == style.error and not options.show_errors then return end
     if s == nil then s = style.font .. "{" .. notransparent .. "}" end
     if duration == nil then duration = MSG_DURATION end
     mp.osd_message(styleOn .. s .. message .. style.reset .. styleOff .. "\n",
         duration)
+end
+
+-- returns true if the provided path exists and is a file
+local function is_file(filepath)
+    mp.msg.info("FILEPATH: " .. filepath)
+    local result = utils.file_info(filepath)
+    if result == nil then
+        print_osd_message("File not found: " .. filepath, 3, style.error)
+        return false
+    end
+    return result.is_file
+end
+
+-- returns the filename given a path (e.g. /home/user/file.txt -> file.txt)
+local function split_path(filepath)
+    if is_file(filepath) then return utils.split_path(filepath) end
 end
 
 local function print_current_video()
@@ -453,9 +456,10 @@ function YouTubeQueue.add_to_queue(url, update_internal_playlist)
     local video, channel_url, channel_name, video_name, video_url
     if is_file(url) then
         video_url = url
-        video_name = get_filename(url)
-        channel_url = get_directory(url)
-        channel_name = get_directory(url)
+        channel_url, video_name = split_path(video_url)
+        mp.msg.info("channel_url: " .. channel_url)
+        mp.msg.info("video_name: " .. video_name)
+        channel_name = "Local file"
 
         video = {
             video_url = video_url,
