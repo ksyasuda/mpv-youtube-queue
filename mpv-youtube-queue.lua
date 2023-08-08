@@ -116,10 +116,8 @@ end
 
 -- returns true if the provided path exists and is a file
 local function is_file(filepath)
-    mp.msg.info("FILEPATH: " .. filepath)
     local result = utils.file_info(filepath)
     if result == nil then
-        print_osd_message("File not found: " .. filepath, 3, style.error)
         return false
     end
     return result.is_file
@@ -454,20 +452,7 @@ function YouTubeQueue.add_to_queue(url, update_internal_playlist)
     end
 
     local video, channel_url, channel_name, video_name, video_url
-    if is_file(url) then
-        video_url = url
-        channel_url, video_name = split_path(video_url)
-        mp.msg.info("channel_url: " .. channel_url)
-        mp.msg.info("video_name: " .. video_name)
-        channel_name = "Local file"
-
-        video = {
-            video_url = video_url,
-            video_name = video_name,
-            channel_url = channel_url,
-            channel_name = channel_name
-        }
-    else
+    if not is_file(url) then
         channel_url, channel_name, video_name = YouTubeQueue.get_video_info(url)
         url = remove_quotes(url)
         if (channel_url == nil or channel_name == nil or video_name == nil) or
@@ -482,6 +467,16 @@ function YouTubeQueue.add_to_queue(url, update_internal_playlist)
                 channel_name = channel_name
             }
         end
+    else
+        channel_url, video_name = split_path(video_url)
+        channel_name = "Local file"
+
+        video = {
+            video_url = url,
+            video_name = video_name,
+            channel_url = channel_url,
+            channel_name = "Local file"
+        }
     end
 
     table.insert(video_queue, video)
