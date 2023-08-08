@@ -91,8 +91,25 @@ local current_video = nil
 
 -- HELPERS {{{
 
+-- surround string with single quotes
+local function surround_with_quotes(s) return '\'' .. s .. '\'' end
+
 -- run sleep shell command for n seconds
 local function sleep(n) os.execute("sleep " .. tonumber(n)) end
+
+-- returns true if the provided path exists and is a file
+local function is_file(filepath)
+    local result = os.execute("test -f " .. surround_with_quotes(filepath))
+    return result
+end
+
+-- returns the filename given a path (e.g. /home/user/file.txt -> file.txt)
+local function get_filename(filepath) return string.match(filepath, ".+/(.+)$") end
+
+-- return the directory given a path (e.g. /home/user/file.txt -> /home/user)
+local function get_directory(filepath)
+    return surround_with_quotes(string.match(filepath, "(.+)/.+"))
+end
 
 local function print_osd_message(message, duration, s)
     if s == style.error and not options.show_errors then return end
@@ -104,8 +121,12 @@ end
 
 local function print_current_video()
     local current = YouTubeQueue.get_current_video()
-    print_osd_message("Playing: " .. current.video_name .. ' by ' ..
-        current.channel_name, 3)
+    if is_file(current.video_url) then
+        print_osd_message("Playing: " .. current.video_name, 3)
+    else
+        print_osd_message("Playing: " .. current.video_name .. ' by ' ..
+            current.channel_name, 3)
+    end
 end
 
 local function expanduser(path)
@@ -124,7 +145,7 @@ local function expanduser(path)
 end
 
 local function open_url_in_browser(url)
-    local command = options.browser .. " " .. url
+    local command = options.browser .. " " .. surround_with_quotes(url)
     os.execute(command)
 end
 
@@ -187,7 +208,7 @@ end
 function YouTubeQueue.get_video_info(url)
     local command =
         'yt-dlp --print channel_url --print uploader --print title --playlist-items 1 ' ..
-        url
+        surround_with_quotes(url)
     local handle = io.popen(command)
     if handle == nil then return nil, nil, nil end
 
@@ -404,8 +425,10 @@ function YouTubeQueue.play_next_in_queue()
     sleep(MSG_DURATION)
 end
 
--- add the video to the queue from the clipboard
-function YouTubeQueue.add_to_queue(url)
+-- add the video to the queue from the clipboard or call from script-message
+-- updates the internal playlist by default, pass 0 to disable
+function YouTubeQueue.add_to_queue(url, update_internal_playlist)
+    if update_internal_playlist == nil then update_internal_playlist = 0 end
     if url == nil or url == "" then
         url = YouTubeQueue.get_clipboard_content()
         if url == nil or url == "" then
@@ -418,29 +441,45 @@ function YouTubeQueue.add_to_queue(url)
         print_osd_message("Video already in queue.", MSG_DURATION, style.error)
         return
     end
-    local channel_url, channel_name, video_name =
-        YouTubeQueue.get_video_info(url)
-    if (channel_url == nil or channel_name == nil or video_name == nil) or
-        (channel_url == "" or channel_name == "" or video_name == "") then
-        print_osd_message("Error getting video info.", MSG_DURATION, style.error)
-        return
+
+    local video, channel_url, channel_name, video_name, video_url
+    if is_file(url) then
+        video_url = url
+        video_name = get_filename(url)
+        channel_url = get_directory(url)
+        channel_name = get_directory(url)
+
+        video = {
+            video_url = video_url,
+            video_name = video_name,
+            channel_url = channel_url,
+            channel_name = channel_name
+        }
+    else
+        channel_url, channel_name, video_name = YouTubeQueue.get_video_info(url)
+        if (channel_url == nil or channel_name == nil or video_name == nil) or
+            (channel_url == "" or channel_name == "" or video_name == "") then
+            print_osd_message("Error getting video info.", MSG_DURATION,
+                style.error)
+        else
+            video = {
+                video_url = url,
+                video_name = video_name,
+                channel_url = channel_url,
+                channel_name = channel_name
+            }
+        end
     end
 
-    local video = {
-        video_url = url,
-        video_name = video_name,
-        channel_url = channel_url,
-        channel_name = channel_name
-    }
     table.insert(video_queue, video)
     -- if the queue was empty, start playing the video
     -- otherwise, add the video to the playlist
     if not YouTubeQueue.get_current_video() then
         YouTubeQueue.play_next_in_queue()
-    else
+    elseif update_internal_playlist == 0 then
         mp.commandv("loadfile", url, "append-play")
-        print_osd_message("Added " .. video_name .. " to queue.", MSG_DURATION)
     end
+    print_osd_message("Added " .. video_name .. " to queue.", MSG_DURATION)
 end
 
 -- play the previous video in the queue
@@ -493,6 +532,11 @@ function YouTubeQueue.download_video_at(idx)
 end
 
 function YouTubeQueue.download_current_video()
+    if is_file(current_video.video_url) then
+        print_osd_message("Current video is a local file... doing nothing.",
+            MSG_DURATION, style.error)
+        return
+    end
     if current_video ~= nil and current_video ~= "" then
         YouTubeQueue.download_video_at(index)
     else
@@ -503,6 +547,11 @@ end
 function YouTubeQueue.download_selected_video()
     if selected_index == 1 and current_video == nil then
         print_osd_message("No video to download.", MSG_DURATION, style.error)
+        return
+    end
+    if is_file(YouTubeQueue.get_video_at(selected_index)) then
+        print_osd_message("Current video is a local file... doing nothing.",
+            MSG_DURATION, style.error)
         return
     end
     YouTubeQueue.download_video_at(selected_index)
@@ -539,7 +588,7 @@ local function on_track_changed() YouTubeQueue.update_current_index() end
 -- Function to be called when the playback-restart event is triggered
 local function on_playback_restart()
     local playlist_size = mp.get_property_number("playlist-count", 0)
-    if playlist_size > 1 then
+    if current_video ~= nil and playlist_size > 1 then
         YouTubeQueue.update_current_index()
     elseif current_video == nil then
         local url = mp.get_property("path")
@@ -558,9 +607,9 @@ mp.add_key_binding(options.play_previous_in_queue, "play_previous_video",
     YouTubeQueue.play_previous_video)
 mp.add_key_binding(options.print_queue, "print_queue", YouTubeQueue.print_queue)
 mp.add_key_binding(options.move_cursor_up, "move_cursor_up",
-    YouTubeQueue.move_cursor_up)
+    YouTubeQueue.move_cursor_up, { repeatable = true })
 mp.add_key_binding(options.move_cursor_down, "move_cursor_down",
-    YouTubeQueue.move_cursor_down)
+    YouTubeQueue.move_cursor_down, { repeatable = true })
 mp.add_key_binding(options.play_selected_video, "play_selected_video",
     YouTubeQueue.play_selected_video)
 mp.add_key_binding(options.open_video_in_browser, "open_video_in_browser",
