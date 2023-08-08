@@ -91,8 +91,25 @@ local current_video = nil
 
 -- HELPERS {{{
 
+-- surround string with single quotes
+local function surround_with_quotes(s) return '\'' .. s .. '\'' end
+
 -- run sleep shell command for n seconds
 local function sleep(n) os.execute("sleep " .. tonumber(n)) end
+
+-- returns true if the provided path exists and is a file
+local function is_file(filepath)
+    local result = os.execute("test -f " .. surround_with_quotes(filepath))
+    return result
+end
+
+-- returns the filename given a path (e.g. /home/user/file.txt -> file.txt)
+local function get_filename(filepath) return string.match(filepath, ".+/(.+)$") end
+
+-- return the directory given a path (e.g. /home/user/file.txt -> /home/user)
+local function get_directory(filepath)
+    return surround_with_quotes(string.match(filepath, "(.+)/.+"))
+end
 
 local function print_osd_message(message, duration, s)
     if s == style.error and not options.show_errors then return end
@@ -124,7 +141,7 @@ local function expanduser(path)
 end
 
 local function open_url_in_browser(url)
-    local command = options.browser .. " " .. url
+    local command = options.browser .. " " .. surround_with_quotes(url)
     os.execute(command)
 end
 
@@ -187,7 +204,7 @@ end
 function YouTubeQueue.get_video_info(url)
     local command =
         'yt-dlp --print channel_url --print uploader --print title --playlist-items 1 ' ..
-        url
+        surround_with_quotes(url)
     local handle = io.popen(command)
     if handle == nil then return nil, nil, nil end
 
@@ -418,20 +435,36 @@ function YouTubeQueue.add_to_queue(url)
         print_osd_message("Video already in queue.", MSG_DURATION, style.error)
         return
     end
-    local channel_url, channel_name, video_name =
-        YouTubeQueue.get_video_info(url)
-    if (channel_url == nil or channel_name == nil or video_name == nil) or
-        (channel_url == "" or channel_name == "" or video_name == "") then
-        print_osd_message("Error getting video info.", MSG_DURATION, style.error)
-        return
+
+    local video, channel_url, channel_name, video_name, video_url
+    if is_file(url) then
+        video_url = url
+        video_name = get_filename(url)
+        channel_url = get_directory(url)
+        channel_name = get_directory(url)
+
+        video = {
+            video_url = video_url,
+            video_name = video_name,
+            channel_url = channel_url,
+            channel_name = channel_name
+        }
+    else
+        channel_url, channel_name, video_name = YouTubeQueue.get_video_info(url)
+        if (channel_url == nil or channel_name == nil or video_name == nil) or
+            (channel_url == "" or channel_name == "" or video_name == "") then
+            print_osd_message("Error getting video info.", MSG_DURATION,
+                style.error)
+        else
+            video = {
+                video_url = url,
+                video_name = video_name,
+                channel_url = channel_url,
+                channel_name = channel_name
+            }
+        end
     end
 
-    local video = {
-        video_url = url,
-        video_name = video_name,
-        channel_url = channel_url,
-        channel_name = channel_name
-    }
     table.insert(video_queue, video)
     -- if the queue was empty, start playing the video
     -- otherwise, add the video to the playlist
