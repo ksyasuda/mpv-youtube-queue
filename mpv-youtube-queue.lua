@@ -91,8 +91,16 @@ local current_video = nil
 
 -- HELPERS {{{
 
--- surround string with single quotes
-local function surround_with_quotes(s) return '\'' .. s .. '\'' end
+-- surround string with single quotes if it does not already have them
+local function surround_with_quotes(s)
+    if string.sub(s, 0, 1) == "'" and string.sub(s, -1) == "'" then
+        return s
+    else
+        return "'" .. s .. "'"
+    end
+end
+
+local function remove_quotes(s) return string.gsub(s, "'", "") end
 
 -- run sleep shell command for n seconds
 local function sleep(n) os.execute("sleep " .. tonumber(n)) end
@@ -457,6 +465,7 @@ function YouTubeQueue.add_to_queue(url, update_internal_playlist)
         }
     else
         channel_url, channel_name, video_name = YouTubeQueue.get_video_info(url)
+        url = remove_quotes(url)
         if (channel_url == nil or channel_name == nil or video_name == nil) or
             (channel_url == "" or channel_name == "" or video_name == "") then
             print_osd_message("Error getting video info.", MSG_DURATION,
