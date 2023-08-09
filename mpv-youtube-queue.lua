@@ -211,15 +211,21 @@ end
 
 -- returns the content of the clipboard
 function YouTubeQueue.get_clipboard_content()
-    local handle = io.popen(options.clipboard_command)
-    if handle == nil then
-        print_osd_message("Error getting clipboard content", MSG_DURATION,
+    local command, args = options.clipboard_command:match("(%S+)%s+(%S+)")
+    local res = mp.command_native({
+        name = "subprocess",
+        playback_only = false,
+        capture_stdout = true,
+        args = { command, args }
+    })
+
+    if res.status ~= 0 then
+        print_osd_message("Failed to get clipboard content", MSG_DURATION,
             style.error)
         return nil
     end
-    local result = handle:read("*a")
-    handle:close()
-    return result
+
+    return res.stdout
 end
 
 function YouTubeQueue.get_video_info(url)
@@ -527,33 +533,31 @@ function YouTubeQueue.download_video_at(idx)
     local v = video_queue[idx]
     local q = o.download_quality:sub(1, -2)
     local dl_dir = expanduser(o.download_directory)
-    local command = 'yt-dlp -f \'bestvideo[height<=' .. q .. '][ext=' ..
-        options.ytdlp_file_format .. ']+bestaudio/best[height<=' ..
-        q .. ']/bestvideo[height<=' .. q ..
-        ']+bestaudio/best[height<=' .. q .. ']\' -o "' .. dl_dir ..
-        "/" .. options.ytdlp_output_template ..
-        '" --downloader ' .. o.downloader .. ' ' .. v.video_url
 
+    print_osd_message("Downloading " .. v.video_name .. "...", MSG_DURATION)
     -- Run the download command
-    local handle = io.popen(command)
-    if handle == nil then
-        print_osd_message("Error starting download.", MSG_DURATION, style.error)
-        return
-    end
-    print_osd_message("Starting download for " .. v.video_name, MSG_DURATION)
-    local result = handle:read("*a")
-    handle:close()
-    if result == nil then
-        print_osd_message("Error starting download.", MSG_DURATION, style.error)
-        return
-    end
-
-    if result then
-        print_osd_message("Finished downloading " .. v.video_name, MSG_DURATION)
-    else
-        print_osd_message("Error downloading " .. v.video_name, MSG_DURATION,
-            style.error)
-    end
+    -- local handle = io.popen(command)
+    mp.command_native_async({
+        name = "subprocess",
+        capture_stderr = true,
+        detach = true,
+        args = {
+            "yt-dlp", "-f",
+            "bestvideo[height<=" .. q .. "][ext=" .. options.ytdlp_file_format ..
+            "]+bestaudio/best[height<=" .. q .. "]/bestvideo[height<=" .. q ..
+            "]+bestaudio/best[height<=" .. q .. "]", "-o",
+            dl_dir .. "/" .. options.ytdlp_output_template, "--downloader",
+            o.downloader, "--", v.video_url
+        }
+    }, function(success, _, err)
+        if success then
+            print_osd_message("Finished downloading " .. v.video_name .. ".",
+                MSG_DURATION)
+        else
+            print_osd_message("Error downloading " .. v.video_name .. ": " ..
+                err, MSG_DURATION, style.error)
+        end
+    end)
 end
 
 function YouTubeQueue.download_current_video()
