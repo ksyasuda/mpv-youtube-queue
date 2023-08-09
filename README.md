@@ -72,7 +72,7 @@ This script requires the following software to be installed on the system
 - `browser - firefox`: The browser to use when opening a video or channel page
 - `clipboard_command - xclip -o`: The command to use to get the contents of the clipboard
 - `cursor_icon - ➤`: The icon to use for the cursor
-- `display_limit - 6`: The maximum amount of videos to show on the OSD at once
+- `display_limit - 10`: The maximum amount of videos to show on the OSD at once
 - `download_directory - ~/videos/YouTube`: The directory to use when
   downloading a video
 - `download_quality 720p`: The maximum download quality
