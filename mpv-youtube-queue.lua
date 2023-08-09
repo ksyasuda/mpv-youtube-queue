@@ -104,7 +104,6 @@ end
 timeout = mp.add_periodic_timer(5, destroy)
 
 -- HELPERS {{{
-
 -- surround string with single quotes if it does not already have them
 local function surround_with_quotes(s)
     if string.sub(s, 0, 1) == "'" and string.sub(s, -1) == "'" then
@@ -161,11 +160,11 @@ local function open_url_in_browser(url)
 end
 
 local function open_video_in_browser()
-    open_url_in_browser(YouTubeQueue.get_current_video().video_url)
+    open_url_in_browser(current_video.video_url)
 end
 
 local function open_channel_in_browser()
-    open_url_in_browser(YouTubeQueue.get_current_video().channel_url)
+    open_url_in_browser(current_video.channel_url)
 end
 
 -- local function _print_internal_playlist()
@@ -187,19 +186,6 @@ end
 -- }}}
 
 -- QUEUE GETTERS AND SETTERS {{{
-
-function YouTubeQueue.size() return #video_queue end
-
-function YouTubeQueue.get_current_index() return index end
-
-function YouTubeQueue.get_video_queue() return video_queue end
-
-function YouTubeQueue.set_current_index(idx)
-    index = idx
-    current_video = video_queue[idx]
-end
-
-function YouTubeQueue.get_current_video() return current_video end
 
 function YouTubeQueue.get_video_at(idx)
     if idx <= 0 or idx > #video_queue then
@@ -433,13 +419,8 @@ function YouTubeQueue.play_video_at(idx)
     index = idx
     selected_index = idx
     mp.set_property_number("playlist-pos", index - 1) -- zero-based index
-    return current_video
-end
-
-function YouTubeQueue.play_selected_video()
-    -- local current_index = YouTubeQueue.get_current_index()
-    YouTubeQueue.play_video_at(selected_index)
     YouTubeQueue.print_current_video()
+    return current_video
 end
 
 -- play the next video in the queue
@@ -520,7 +501,7 @@ function YouTubeQueue.add_to_queue(url, update_internal_playlist)
     table.insert(video_queue, video)
     -- if the queue was empty, start playing the video
     -- otherwise, add the video to the playlist
-    if not YouTubeQueue.get_current_video() then
+    if not current_video then
         YouTubeQueue.play_video("NEXT")
     elseif update_internal_playlist == 0 then
         mp.commandv("loadfile", url, "append-play")
@@ -529,8 +510,14 @@ function YouTubeQueue.add_to_queue(url, update_internal_playlist)
 end
 
 function YouTubeQueue.download_video_at(idx)
-    local o = options
+    if idx < 0 or idx > #video_queue then return end
     local v = video_queue[idx]
+    if is_file(v.video_url) then
+        print_osd_message("Current video is a local file... doing nothing.",
+            MSG_DURATION, style.error)
+        return
+    end
+    local o = options
     local q = o.download_quality:sub(1, -2)
     local dl_dir = expanduser(o.download_directory)
 
@@ -558,32 +545,6 @@ function YouTubeQueue.download_video_at(idx)
                 err, MSG_DURATION, style.error)
         end
     end)
-end
-
-function YouTubeQueue.download_current_video()
-    if is_file(current_video.video_url) then
-        print_osd_message("Current video is a local file... doing nothing.",
-            MSG_DURATION, style.error)
-        return
-    end
-    if current_video ~= nil and current_video ~= "" then
-        YouTubeQueue.download_video_at(index)
-    else
-        print_osd_message("No video to download.", MSG_DURATION, style.error)
-    end
-end
-
-function YouTubeQueue.download_selected_video()
-    if selected_index == 1 and current_video == nil then
-        print_osd_message("No video to download.", MSG_DURATION, style.error)
-        return
-    end
-    if is_file(YouTubeQueue.get_video_at(selected_index).video_name) then
-        print_osd_message("Current video is a local file... doing nothing.",
-            MSG_DURATION, style.error)
-        return
-    end
-    YouTubeQueue.download_video_at(selected_index)
 end
 
 function YouTubeQueue.remove_from_queue()
@@ -642,7 +603,7 @@ mp.add_key_binding(options.move_cursor_down, "move_cursor_down",
     function() YouTubeQueue.move_cursor(-1) end,
     { repeatable = true })
 mp.add_key_binding(options.play_selected_video, "play_selected_video",
-    YouTubeQueue.play_selected_video)
+    function() YouTubeQueue.play_video_at(selected_index) end)
 mp.add_key_binding(options.open_video_in_browser, "open_video_in_browser",
     open_video_in_browser)
 mp.add_key_binding(options.print_current_video, "print_current_video",
@@ -650,9 +611,9 @@ mp.add_key_binding(options.print_current_video, "print_current_video",
 mp.add_key_binding(options.open_channel_in_browser, "open_channel_in_browser",
     open_channel_in_browser)
 mp.add_key_binding(options.download_current_video, "download_current_video",
-    YouTubeQueue.download_current_video)
+    function() YouTubeQueue.download_video_at(index) end)
 mp.add_key_binding(options.download_selected_video, "download_selected_video",
-    YouTubeQueue.download_selected_video)
+    function() YouTubeQueue.download_video_at(selected_index) end)
 mp.add_key_binding(options.move_video, "move_video",
     YouTubeQueue.mark_and_move_video)
 mp.add_key_binding(options.remove_from_queue, "delete_video",
