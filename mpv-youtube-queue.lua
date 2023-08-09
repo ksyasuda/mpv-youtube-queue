@@ -16,6 +16,7 @@
 local mp = require 'mp'
 mp.options = require 'mp.options'
 local utils = require 'mp.utils'
+local assdraw = require 'mp.assdraw'
 local styleOn = mp.get_property("osd-ass-cc/0")
 local styleOff = mp.get_property("osd-ass-cc/1")
 
@@ -51,6 +52,7 @@ local options = {
 
 mp.options.read_options(options, "mpv-youtube-queue")
 
+-- STYLE {{{
 local colors = {
     error = "676EFF",
     selected = "F993BD",
@@ -79,6 +81,7 @@ local style = {
     font = "{\\fn" .. options.font_name .. "\\fs" .. options.font_size .. "{" ..
         sortoftransparent .. "}"
 }
+-- }}}
 
 local YouTubeQueue = {}
 local video_queue = {}
@@ -89,6 +92,16 @@ local selected_index = 1
 local display_offset = 0
 local marked_index = nil
 local current_video = nil
+local destroyer = nil
+local timeout
+
+local function destroy()
+    timeout:kill()
+    mp.set_osd_ass(0, 0, "")
+    destroyer = nil
+end
+
+timeout = mp.add_periodic_timer(5, destroy)
 
 -- HELPERS {{{
 
@@ -108,6 +121,7 @@ local function sleep(n) os.execute("sleep " .. tonumber(n)) end
 
 local function print_osd_message(message, duration, s)
     if s == style.error and not options.show_errors then return end
+    destroy()
     if s == nil then s = style.font .. "{" .. notransparent .. "}" end
     if duration == nil then duration = MSG_DURATION end
     mp.osd_message(styleOn .. s .. message .. style.reset .. styleOff .. "\n",
@@ -117,25 +131,13 @@ end
 -- returns true if the provided path exists and is a file
 local function is_file(filepath)
     local result = utils.file_info(filepath)
-    if result == nil then
-        return false
-    end
+    if result == nil then return false end
     return result.is_file
 end
 
 -- returns the filename given a path (e.g. /home/user/file.txt -> file.txt)
 local function split_path(filepath)
     if is_file(filepath) then return utils.split_path(filepath) end
-end
-
-local function print_current_video()
-    local current = YouTubeQueue.get_current_video()
-    if is_file(current.video_url) then
-        print_osd_message("Playing: " .. current.video_name, 3)
-    else
-        print_osd_message("Playing: " .. current.video_name .. ' by ' ..
-            current.channel_name, 3)
-    end
 end
 
 local function expanduser(path)
@@ -166,16 +168,22 @@ local function open_channel_in_browser()
     open_url_in_browser(YouTubeQueue.get_current_video().channel_url)
 end
 
--- local function is_valid_ytdlp_url(url)
---     local command = 'yt-dlp --simulate \'' .. url .. '\' >/dev/null 2>&1'
---     local handle = io.popen(command .. "; echo $?")
---     if handle == nil then return false end
---     local result = handle:read("*a")
---     if result == nil then return false end
---     handle:close()
---     return result:gsub("%s+$", "") == "0"
--- end
+local function _print_internal_playlist()
+    local count = mp.get_property_number("playlist-count")
+    print("Playlist contents:")
+    for i = 0, count - 1 do
+        local uri = mp.get_property(string.format("playlist/%d/filename", i))
+        print(string.format("%d: %s", i, uri))
+    end
+end
 
+local function toggle_print()
+    if destroyer ~= nil then
+        destroyer()
+    else
+        YouTubeQueue.print_queue()
+    end
+end
 -- }}}
 
 -- QUEUE GETTERS AND SETTERS {{{
@@ -236,27 +244,41 @@ function YouTubeQueue.get_video_info(url)
     return channel_url, channel_name, video_name
 end
 
--- }}}
-
--- QUEUE FUNCTIONS {{{
--- Function to get the next video in the queue
--- Returns nil if there are no videos in the queue
-function YouTubeQueue.next_in_queue()
-    if index < #video_queue then
-        index = index + 1
-        selected_index = index
-        current_video = video_queue[index]
-        return current_video
+function YouTubeQueue.print_current_video()
+    destroy()
+    local current = current_video
+    if is_file(current.video_url) then
+        print_osd_message("Playing: " .. current.video_name, 3)
+    else
+        print_osd_message("Playing: " .. current.video_name .. ' by ' ..
+            current.channel_name, 3)
     end
 end
 
-function YouTubeQueue.prev_in_queue()
-    if index > 1 then
-        index = index - 1
-        selected_index = index
-        current_video = video_queue[index]
-        return current_video
+-- }}}
+
+-- QUEUE FUNCTIONS {{{
+
+-- Function to set the next or previous video in the queue as the current video
+-- direction can be "NEXT" or "PREV".  If nil, "next" is assumed
+-- Returns nil if there are no more videos in the queue
+function YouTubeQueue.set_video(direction)
+    local amt
+    direction = string.upper(direction)
+    if (direction == "NEXT" or direction == nil) then
+        amt = 1
+    elseif (direction == "PREV" or direction == "PREVIOUS") then
+        amt = -1
+    else
+        print_osd_message("Invalid direction: " .. direction, MSG_DURATION,
+            style.error)
+        return nil
     end
+    if index + amt > #video_queue or index + amt == 0 then return nil end
+    index = index + amt
+    selected_index = index
+    current_video = video_queue[index]
+    return current_video
 end
 
 function YouTubeQueue.is_in_queue(url)
@@ -309,11 +331,14 @@ function YouTubeQueue.reorder_queue(from_index, to_index)
         table.remove(video_queue, from_index)
         table.insert(video_queue, to_index, temp_video)
 
-        -- Swap the videos between the two provided indices in the MPV playlist
-        mp.commandv("playlist-move", from_index - 1, to_index - 1)
-
-        -- Redraw the queue after reordering
-        YouTubeQueue.print_queue()
+        -- swap the videos in the mpv playlist
+        -- playlist-move is 0-indexed and works the opposite of what is expected
+        -- ex: playlist-move 1 2 will move the video at index 2 to index 1
+        mp.commandv("loadfile", video_queue[to_index].video_url, "append")
+        mp.commandv("playlist-move", #video_queue, to_index - 1)
+        mp.commandv("playlist-move", to_index - 1, from_index - 1)
+        mp.commandv("playlist-move", from_index - 1, #video_queue)
+        mp.commandv("playlist-remove", #video_queue)
     else
         print_osd_message("Invalid indices for reordering. No changes made.",
             MSG_DURATION, style.error)
@@ -321,36 +346,38 @@ function YouTubeQueue.reorder_queue(from_index, to_index)
 end
 
 function YouTubeQueue.print_queue(duration)
+    timeout:kill()
+    timeout:resume()
+    local ass = assdraw.ass_new()
     local current_index = index
-    if duration == nil then duration = 3 end
     if #video_queue > 0 then
         local start_index = math.max(1, selected_index - display_limit / 2)
         local end_index =
             math.min(#video_queue, start_index + display_limit - 1)
         display_offset = start_index - 1
 
-        local message =
-            styleOn .. style.header .. "MPV-YOUTUBE-QUEUE{\\u0\\b0}" ..
-            style.reset .. style.font .. "\n"
+        ass:append(
+            style.header .. "MPV-YOUTUBE-QUEUE{\\u0\\b0}" .. style.reset ..
+            style.font .. "\n")
+        local message
         for i = start_index, end_index do
             local prefix = (i == selected_index) and style.cursor ..
                 options.cursor_icon .. " " .. style.reset or
                 "   "
             if i == current_index and i == selected_index then
-                message =
-                    message .. prefix .. style.hover_selected .. i .. ". " ..
+                message = prefix .. style.hover_selected .. i .. ". " ..
                     video_queue[i].video_name .. " - (" ..
                     video_queue[i].channel_name .. ")" .. style.reset
             elseif i == current_index then
-                message = message .. prefix .. style.selected .. i .. ". " ..
+                message = prefix .. style.selected .. i .. ". " ..
                     video_queue[i].video_name .. " - (" ..
                     video_queue[i].channel_name .. ")" .. style.reset
             elseif i == selected_index then
-                message = message .. prefix .. style.hover .. i .. ". " ..
+                message = prefix .. style.hover .. i .. ". " ..
                     video_queue[i].video_name .. " - (" ..
                     video_queue[i].channel_name .. ")" .. style.reset
             else
-                message = message .. prefix .. style.reset .. i .. ". " ..
+                message = prefix .. style.reset .. i .. ". " ..
                     video_queue[i].video_name .. " - (" ..
                     video_queue[i].channel_name .. ")" .. style.reset
             end
@@ -361,49 +388,44 @@ function YouTubeQueue.print_queue(duration)
             else
                 message = message .. "\n"
             end
+            ass:append(style.font .. message)
         end
-        message = message .. styleOff
-        mp.osd_message(message, duration)
+        mp.set_osd_ass(0, 0, ass.text)
+        if duration ~= nil then
+            mp.add_timeout(duration, function() destroy() end)
+        end
     else
         print_osd_message("No videos in the queue or history.", duration,
             style.error)
     end
+    destroyer = destroy
 end
 
-function YouTubeQueue.move_cursor_up(amt)
+function YouTubeQueue.move_cursor(amt)
+    timeout:kill()
+    timeout:resume()
     selected_index = selected_index - amt
     if selected_index < 1 then
         selected_index = 1
     elseif selected_index > #video_queue then
         selected_index = #video_queue
     end
-    if selected_index > 1 and selected_index < display_offset + 1 then
+    if amt == 1 and selected_index > 1 and selected_index < display_offset + 1 then
         display_offset = display_offset - math.abs(selected_index - amt)
-    end
-    YouTubeQueue.print_queue(MSG_DURATION)
-end
-
-function YouTubeQueue.move_cursor_down(amt)
-    selected_index = selected_index + amt
-    if selected_index < 1 then
-        selected_index = 1
-    elseif selected_index > #video_queue then
-        selected_index = #video_queue
-    end
-    if selected_index < #video_queue and selected_index > display_offset + display_limit then
+    elseif amt == -1 and selected_index < #video_queue and selected_index >
+        display_offset + display_limit then
         display_offset = display_offset + math.abs(selected_index - amt)
     end
-    YouTubeQueue.print_queue(MSG_DURATION)
+    YouTubeQueue.print_queue()
 end
 
 function YouTubeQueue.play_video_at(idx)
-    local queue = YouTubeQueue.get_video_queue()
-    if idx <= 0 or idx > #queue then
+    if idx <= 0 or idx > #video_queue then
         print_osd_message("Invalid video index", MSG_DURATION, style.error)
         return nil
     end
-    YouTubeQueue.set_current_index(idx)
-    selected_index = index
+    index = idx
+    selected_index = idx
     mp.set_property_number("playlist-pos", index - 1) -- zero-based index
     return current_video
 end
@@ -411,32 +433,33 @@ end
 function YouTubeQueue.play_selected_video()
     -- local current_index = YouTubeQueue.get_current_index()
     YouTubeQueue.play_video_at(selected_index)
-    YouTubeQueue.print_queue(MSG_DURATION - 0.5)
-    sleep(MSG_DURATION)
-    print_current_video()
+    YouTubeQueue.print_current_video()
 end
 
 -- play the next video in the queue
-function YouTubeQueue.play_next_in_queue()
-    local next_video = YouTubeQueue.next_in_queue()
-    if next_video == nil then
-        print_osd_message("No more videos in the queue.", MSG_DURATION,
-            style.error)
+function YouTubeQueue.play_video(direction)
+    direction = string.upper(direction)
+    local video = YouTubeQueue.set_video(direction)
+    if video == nil then
+        print_osd_message("No video available.", MSG_DURATION, style.error)
         return
     end
-    local current_index = YouTubeQueue.get_current_index()
+    current_video = video
+    selected_index = index
     -- if the current video is not the first in the queue, then play the video
     -- else, check if the video is playing and if not play the video with replace
-    if YouTubeQueue.size() > 1 then
-        mp.set_property_number("playlist-pos", current_index - 1)
-    else
+    if direction == "NEXT" and #video_queue > 1 then
+        YouTubeQueue.play_video_at(index)
+    elseif direction == "NEXT" and #video_queue == 1 then
         local state = mp.get_property("core-idle")
+        -- yes if the video is loaded but not currently playing
         if state == "yes" then
-            mp.commandv("loadfile", next_video.video_url, "replace")
+            mp.commandv("loadfile", video.video_url, "replace")
         end
+    elseif direction == "PREV" or direction == "PREVIOUS" then
+        mp.set_property_number("playlist-pos", index - 1)
     end
-    print_current_video()
-    selected_index = current_index
+    YouTubeQueue.print_current_video()
     sleep(MSG_DURATION)
 end
 
@@ -492,26 +515,11 @@ function YouTubeQueue.add_to_queue(url, update_internal_playlist)
     -- if the queue was empty, start playing the video
     -- otherwise, add the video to the playlist
     if not YouTubeQueue.get_current_video() then
-        YouTubeQueue.play_next_in_queue()
+        YouTubeQueue.play_video("NEXT")
     elseif update_internal_playlist == 0 then
         mp.commandv("loadfile", url, "append-play")
     end
     print_osd_message("Added " .. video_name .. " to queue.", MSG_DURATION)
-end
-
--- play the previous video in the queue
-function YouTubeQueue.play_previous_video()
-    local previous_video = YouTubeQueue.prev_in_queue()
-    if previous_video == nil then
-        print_osd_message("No previous video available.", MSG_DURATION,
-            style.error)
-        return
-    end
-    local current_index = YouTubeQueue.get_current_index()
-    mp.set_property_number("playlist-pos", current_index - 1)
-    selected_index = current_index
-    print_current_video()
-    sleep(MSG_DURATION)
 end
 
 function YouTubeQueue.download_video_at(idx)
@@ -566,7 +574,7 @@ function YouTubeQueue.download_selected_video()
         print_osd_message("No video to download.", MSG_DURATION, style.error)
         return
     end
-    if is_file(YouTubeQueue.get_video_at(selected_index)) then
+    if is_file(YouTubeQueue.get_video_at(selected_index).video_name) then
         print_osd_message("Current video is a local file... doing nothing.",
             MSG_DURATION, style.error)
         return
@@ -619,20 +627,22 @@ end
 mp.add_key_binding(options.add_to_queue, "add_to_queue",
     YouTubeQueue.add_to_queue)
 mp.add_key_binding(options.play_next_in_queue, "play_next_in_queue",
-    YouTubeQueue.play_next_in_queue)
-mp.add_key_binding(options.play_previous_in_queue, "play_previous_video",
-    YouTubeQueue.play_previous_video)
-mp.add_key_binding(options.print_queue, "print_queue", YouTubeQueue.print_queue)
+    function() YouTubeQueue.play_video("NEXT") end)
+mp.add_key_binding(options.play_previous_in_queue, "play_prev_in_queue",
+    function() YouTubeQueue.play_video("PREV") end)
+mp.add_key_binding(options.print_queue, "print_queue", toggle_print)
 mp.add_key_binding(options.move_cursor_up, "move_cursor_up",
-    function() YouTubeQueue.move_cursor_up(1) end, { repeatable = true })
+    function() YouTubeQueue.move_cursor(1) end,
+    { repeatable = true })
 mp.add_key_binding(options.move_cursor_down, "move_cursor_down",
-    function() YouTubeQueue.move_cursor_down(1) end, { repeatable = true })
+    function() YouTubeQueue.move_cursor(-1) end,
+    { repeatable = true })
 mp.add_key_binding(options.play_selected_video, "play_selected_video",
     YouTubeQueue.play_selected_video)
 mp.add_key_binding(options.open_video_in_browser, "open_video_in_browser",
     open_video_in_browser)
 mp.add_key_binding(options.print_current_video, "print_current_video",
-    print_current_video)
+    YouTubeQueue.print_current_video)
 mp.add_key_binding(options.open_channel_in_browser, "open_channel_in_browser",
     open_channel_in_browser)
 mp.add_key_binding(options.download_current_video, "download_current_video",
