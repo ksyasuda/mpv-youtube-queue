@@ -168,14 +168,14 @@ local function open_channel_in_browser()
     open_url_in_browser(YouTubeQueue.get_current_video().channel_url)
 end
 
-local function _print_internal_playlist()
-    local count = mp.get_property_number("playlist-count")
-    print("Playlist contents:")
-    for i = 0, count - 1 do
-        local uri = mp.get_property(string.format("playlist/%d/filename", i))
-        print(string.format("%d: %s", i, uri))
-    end
-end
+-- local function _print_internal_playlist()
+--     local count = mp.get_property_number("playlist-count")
+--     print("Playlist contents:")
+--     for i = 0, count - 1 do
+--         local uri = mp.get_property(string.format("playlist/%d/filename", i))
+--         print(string.format("%d: %s", i, uri))
+--     end
+-- end
 
 local function toggle_print()
     if destroyer ~= nil then
