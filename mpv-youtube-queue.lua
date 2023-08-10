@@ -19,6 +19,16 @@ local utils = require 'mp.utils'
 local assdraw = require 'mp.assdraw'
 local styleOn = mp.get_property("osd-ass-cc/0")
 local styleOff = mp.get_property("osd-ass-cc/1")
+local YouTubeQueue = {}
+local video_queue = {}
+local MSG_DURATION = 1.5
+local index = 0
+local selected_index = 1
+local display_offset = 0
+local marked_index = nil
+local current_video = nil
+local destroyer = nil
+local timeout
 
 local options = {
     add_to_queue = "ctrl+a",
@@ -49,8 +59,15 @@ local options = {
     ytdlp_file_format = "mp4",
     ytdlp_output_template = "%(uploader)s/%(title)s.%(ext)s"
 }
-
 mp.options.read_options(options, "mpv-youtube-queue")
+
+local function destroy()
+    timeout:kill()
+    mp.set_osd_ass(0, 0, "")
+    destroyer = nil
+end
+
+timeout = mp.add_periodic_timer(5, destroy)
 
 -- STYLE {{{
 local colors = {
@@ -82,26 +99,6 @@ local style = {
         sortoftransparent .. "}"
 }
 -- }}}
-
-local YouTubeQueue = {}
-local video_queue = {}
-local MSG_DURATION = 1.5
-local display_limit = options.display_limit
-local index = 0
-local selected_index = 1
-local display_offset = 0
-local marked_index = nil
-local current_video = nil
-local destroyer = nil
-local timeout
-
-local function destroy()
-    timeout:kill()
-    mp.set_osd_ass(0, 0, "")
-    destroyer = nil
-end
-
-timeout = mp.add_periodic_timer(5, destroy)
 
 -- HELPERS {{{
 -- surround string with single quotes if it does not already have them
@@ -343,9 +340,10 @@ function YouTubeQueue.print_queue(duration)
     local ass = assdraw.ass_new()
     local current_index = index
     if #video_queue > 0 then
-        local start_index = math.max(1, selected_index - display_limit / 2)
-        local end_index =
-            math.min(#video_queue, start_index + display_limit - 1)
+        local start_index = math.max(1,
+            selected_index - options.display_limit / 2)
+        local end_index = math.min(#video_queue,
+            start_index + options.display_limit - 1)
         display_offset = start_index - 1
 
         ass:append(
@@ -405,7 +403,7 @@ function YouTubeQueue.move_cursor(amt)
     if amt == 1 and selected_index > 1 and selected_index < display_offset + 1 then
         display_offset = display_offset - math.abs(selected_index - amt)
     elseif amt == -1 and selected_index < #video_queue and selected_index >
-        display_offset + display_limit then
+        display_offset + options.display_limit then
         display_offset = display_offset + math.abs(selected_index - amt)
     end
     YouTubeQueue.print_queue()
@@ -625,4 +623,5 @@ mp.register_event("playback-restart", on_playback_restart)
 
 mp.register_script_message("add_to_queue", YouTubeQueue.add_to_queue)
 mp.register_script_message("print_queue", YouTubeQueue.print_queue)
+mp.register_script_message("toggle_youtube_queue", toggle_print)
 -- }}}
