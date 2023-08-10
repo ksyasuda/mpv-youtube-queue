@@ -354,7 +354,8 @@ function YouTubeQueue.print_queue(duration)
         local message
         for i = start_index, end_index do
             local prefix = (i == selected_index) and style.cursor ..
-                options.cursor_icon .. style.reset or "\\h\\h\\h"
+                options.cursor_icon .. "\\h" .. style.reset or
+                "\\h\\h\\h"
             if i == current_index and i == selected_index then
                 message = prefix .. style.hover_selected .. i .. ". " ..
                     video_queue[i].video_name .. " - (" ..
