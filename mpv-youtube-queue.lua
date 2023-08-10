@@ -55,6 +55,7 @@ local options = {
     font_name = "JetBrains Mono",
     font_size = 12,
     marked_icon = "⇅",
+    menu_timeout = 5,
     show_errors = true,
     ytdlp_file_format = "mp4",
     ytdlp_output_template = "%(uploader)s/%(title)s.%(ext)s"
@@ -67,7 +68,7 @@ local function destroy()
     destroyer = nil
 end
 
-timeout = mp.add_periodic_timer(5, destroy)
+timeout = mp.add_periodic_timer(options.menu_timeout, destroy)
 
 -- STYLE {{{
 local colors = {
@@ -212,25 +213,29 @@ function YouTubeQueue.get_clipboard_content()
 end
 
 function YouTubeQueue.get_video_info(url)
-    local command =
-        'yt-dlp --print channel_url --print uploader --print title --playlist-items 1 ' ..
-        surround_with_quotes(url)
-    local handle = io.popen(command)
-    if handle == nil then return nil, nil, nil end
+    local res = mp.command_native({
+        name = "subprocess",
+        playback_only = false,
+        capture_stdout = true,
+        args = {
+            "yt-dlp", "--print", "channel_url", "--print", "uploader",
+            "--print", "title", "--playlist-items", "1", url
+        }
+    })
 
-    local result = handle:read("*a")
-    handle:close()
+    if res.status ~= 0 then
+        print_osd_message("Failed to get video info", MSG_DURATION, style.error)
+        return nil
+    end
 
-    -- Split the result into URL, name, and video title
-    local channel_url, channel_name, video_name = result:match(
-        "(.-)\n(.-)\n(.*)")
+    local channel_url, uploader, title = res.stdout:match("(.*)\n(.*)\n(.*)\n")
+    if channel_url == nil or uploader == nil or title == nil or channel_url ==
+        "" or uploader == "" or title == "" then
+        print_osd_message("Failed to get video info", MSG_DURATION, style.error)
+        return nil
+    end
 
-    -- Remove trailing whitespace
-    if channel_url ~= nil then channel_url = channel_url:gsub("%s+$", "") end
-    if channel_name ~= nil then channel_name = channel_name:gsub("%s+$", "") end
-    if video_name ~= nil then video_name = video_name:gsub("%s+$", "") end
-
-    return channel_url, channel_name, video_name
+    return channel_url, uploader, title
 end
 
 function YouTubeQueue.print_current_video()
@@ -473,6 +478,7 @@ function YouTubeQueue.add_to_queue(url, update_internal_playlist)
             (channel_url == "" or channel_name == "" or video_name == "") then
             print_osd_message("Error getting video info.", MSG_DURATION,
                 style.error)
+            return
         else
             video = {
                 video_url = url,
@@ -487,6 +493,7 @@ function YouTubeQueue.add_to_queue(url, update_internal_playlist)
             video_name == "" then
             print_osd_message("Error getting video info.", MSG_DURATION,
                 style.error)
+            return
         end
         video = {
             video_url = url,
@@ -521,7 +528,6 @@ function YouTubeQueue.download_video_at(idx)
 
     print_osd_message("Downloading " .. v.video_name .. "...", MSG_DURATION)
     -- Run the download command
-    -- local handle = io.popen(command)
     mp.command_native_async({
         name = "subprocess",
         capture_stderr = true,

@@ -81,6 +81,7 @@ This script requires the following software to be installed on the system
 - `font_size - 12`: Size of the font
 - `marked_icon - ⇅`: The icon to use to mark a video as ready to be moved in
   the queue
+- `menu_timeout - 5`: The number of seconds until the menu times out
 - `show_errors - yes`: Show error messages on the OSD
 - `ytdlp_file_format - mp4`: The preferred file format for downloaded videos
 - `ytdlp_output_template - %(uploader)s/%(title)s.%(ext)s`: The [yt-dlp output
