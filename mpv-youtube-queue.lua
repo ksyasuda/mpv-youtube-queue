@@ -346,11 +346,17 @@ function YouTubeQueue.print_queue(duration)
     local ass = assdraw.ass_new()
     local current_index = index
     if #video_queue > 0 then
-        local start_index = math.max(1,
-            selected_index - options.display_limit / 2)
-        local end_index = math.min(#video_queue,
-            start_index + options.display_limit - 1)
-        display_offset = start_index - 1
+        local half_limit = math.floor(options.display_limit / 2)
+        local start_index, end_index
+
+        if selected_index <= half_limit then
+            start_index = 1
+        else
+            start_index = selected_index - half_limit
+        end
+
+        end_index = start_index + options.display_limit - 1
+        if end_index > #video_queue then end_index = #video_queue end
 
         ass:append(
             style.header .. "MPV-YOUTUBE-QUEUE{\\u0\\b0}" .. style.reset ..
