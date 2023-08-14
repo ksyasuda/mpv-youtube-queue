@@ -165,14 +165,14 @@ local function open_channel_in_browser()
     open_url_in_browser(current_video.channel_url)
 end
 
--- local function _print_internal_playlist()
---     local count = mp.get_property_number("playlist-count")
---     print("Playlist contents:")
---     for i = 0, count - 1 do
---         local uri = mp.get_property(string.format("playlist/%d/filename", i))
---         print(string.format("%d: %s", i, uri))
---     end
--- end
+local function _print_internal_playlist()
+    local count = mp.get_property_number("playlist-count")
+    print("Playlist contents:")
+    for i = 0, count - 1 do
+        local uri = mp.get_property(string.format("playlist/%d/filename", i))
+        print(string.format("%d: %s", i, uri))
+    end
+end
 
 local function toggle_print()
     if destroyer ~= nil then
@@ -320,19 +320,20 @@ function YouTubeQueue.reorder_queue(from_index, to_index)
     -- Check if the provided indices are within the bounds of the video_queue
     if from_index > 0 and from_index <= #video_queue and to_index > 0 and
         to_index <= #video_queue then
-        -- Swap the videos between the two provided indices in the video_queue
+        -- move the video from the from_index to to_index in the internal playlist.
+        -- playlist-move is 0-indexed
+        if from_index < to_index and to_index == #video_queue then
+            mp.commandv("playlist-move", from_index - 1, to_index)
+        elseif from_index < to_index then
+            mp.commandv("playlist-move", to_index - 1, from_index - 1)
+        else
+            mp.commandv("playlist-move", from_index - 1, to_index - 1)
+        end
+
+        -- Remove from from_index and insert at to_index into YouTubeQueue
         local temp_video = video_queue[from_index]
         table.remove(video_queue, from_index)
         table.insert(video_queue, to_index, temp_video)
-
-        -- swap the videos in the mpv playlist
-        -- playlist-move is 0-indexed and works the opposite of what is expected
-        -- ex: playlist-move 1 2 will move the video at index 2 to index 1
-        mp.commandv("loadfile", video_queue[to_index].video_url, "append")
-        mp.commandv("playlist-move", #video_queue, to_index - 1)
-        mp.commandv("playlist-move", to_index - 1, from_index - 1)
-        mp.commandv("playlist-move", from_index - 1, #video_queue)
-        mp.commandv("playlist-remove", #video_queue)
     else
         print_osd_message("Invalid indices for reordering. No changes made.",
             MSG_DURATION, style.error)
@@ -627,7 +628,12 @@ mp.register_event("end-file", on_end_file)
 mp.register_event("track-changed", on_track_changed)
 mp.register_event("playback-restart", on_playback_restart)
 
+-- keep for backwards compatibility
 mp.register_script_message("add_to_queue", YouTubeQueue.add_to_queue)
 mp.register_script_message("print_queue", YouTubeQueue.print_queue)
+
+mp.register_script_message("add_to_youtube_queue", YouTubeQueue.add_to_queue)
 mp.register_script_message("toggle_youtube_queue", toggle_print)
+mp.register_script_message("print_internal_playlist", _print_internal_playlist)
+mp.register_script_message("reorder_youtube_queue", YouTubeQueue.reorder_queue)
 -- }}}
