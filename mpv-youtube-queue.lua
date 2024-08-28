@@ -324,8 +324,10 @@ function YouTubeQueue.reorder_queue(from_index, to_index)
         -- playlist-move is 0-indexed
         if from_index < to_index and to_index == #video_queue then
             mp.commandv("playlist-move", from_index - 1, to_index)
+            if to_index > index then index = index - 1 end
         elseif from_index < to_index then
-            mp.commandv("playlist-move", to_index - 1, from_index - 1)
+            mp.commandv("playlist-move", from_index - 1, to_index)
+            if to_index > index then index = index - 1 end
         else
             mp.commandv("playlist-move", from_index - 1, to_index - 1)
         end
