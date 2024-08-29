@@ -2,7 +2,7 @@
 
 <div align="center">
 
-A Lua script that implements the YouTube 'Add to Queue' functionality for mpv
+A Lua script that replicates and extends the YouTube "Add to Queue" feature for mpv
 
 </div>
 
@@ -10,38 +10,28 @@ A Lua script that implements the YouTube 'Add to Queue' functionality for mpv
 
 ## Features
 
-- Add videos to a queue from the clipboard
-  - Works with links from any site
-    [supported by yt-dlp](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md "yd-dlp supported sites page")
-- An interactive menu to show the queue, to select a video to play, or to edit the order of the queue
-- Customizable keybindings to interact with the currrently playing video and the
-  queue
-- Open the URL or channel page of the currently playing video in a new browser tab
-- Download a video in the queue using yt-dlp
-- Customizable download options
-- Integrates with the internal mpv playlist
-
-## Notes
-
-- This script uses the Linux `xclip` utility to read from the clipboard.
-  If you're on macOS or Windows, you'll need to adjust the `clipboard_command`
-  config variable in [mpv-youtube-queue.conf](./mpv-youtube-queue.conf)
-- When adding videos to the queue, the script fetches the video name using
-  `yt-dlp`. Ensure you have `yt-dlp` installed and in your PATH.
+- **Interactive Queue Management:** A menu-driven interface for adding, removing, and rearranging videos in your queue
+- **yt-dlp Integration:** Works with any link supported by [yt-dlp](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md "yd-dlp supported sites page") and supports downloading a supported video in the queue
+- **Internal Playlist Integration:** Seamlessly integrates with mpv's internal playlist for a unified playback experience
+- **Customizable Keybindings:** Assign your preferred hotkeys to interact with the currently playing video and queue
 
 ## Requirements
 
 This script requires the following software to be installed on the system
 
-- [xclip](https://github.com/astrand/xclip)
+- One of [xclip](https://github.com/astrand/xclip), [wl-clipboard](https://github.com/bugaevc/wl-clipboard), or any command-line utility that can paste from the system clipboard
+  - Windows users can utilize `Get-Clipboard` from powershell by setting the `clipboard_command` in `mpv-youtube-queue.conf` file to the following: `clipboard_command=powershell -command Get-Clipboard`
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp)
 
 ## Installation
 
-- Copy the `mpv-youtube-queue.lua` script to your `~~/scripts` directory
-  (`~/.config/mpv` on Linux)
-- Optionally copy the `mpv-youtube-queue.conf` to the `~~/script-opts` directory
-  to customize the script configuration as described in the next section
+- Copy `mpv-youtube-queue.lua` script to your `~~/scripts` directory
+  - `~/.config/mpv/scripts` on Linux
+  - `%APPDATA%\mpv\scripts` on Windows
+- Optionally copy `mpv-youtube-queue.conf` to the `~~/script-opts` directory
+  - `~/.config/mpv/script-opts` on Linux
+  - `%APPDATA%\mpv\script-opts` on Windows
+    to customize the script configuration as described in the next section
 
 ## Configuration
 
@@ -67,7 +57,7 @@ This script requires the following software to be installed on the system
 - `play_selected_video - ctrl+ENTER`: Play the currently selected video in
   the queue
 
-### Default Option
+### Default Options
 
 - `browser - firefox`: The browser to use when opening a video or channel page
 - `clipboard_command - xclip -o`: The command to use to get the contents of the clipboard
