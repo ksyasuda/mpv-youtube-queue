@@ -58,7 +58,9 @@ local options = {
     menu_timeout = 5,
     show_errors = true,
     ytdlp_file_format = "mp4",
-    ytdlp_output_template = "%(uploader)s/%(title)s.%(ext)s"
+    ytdlp_output_template = "%(uploader)s/%(title)s.%(ext)s",
+    backend_host = "http://localhost",
+    backend_port = "42069"
 }
 mp.options.read_options(options, "mpv-youtube-queue")
 
@@ -204,6 +206,30 @@ local function _split_command(cmd)
     for arg in cmd:gmatch("%S+") do table.insert(components, arg) end
     _remove_command_quotes(components)
     return components
+end
+
+function YouTubeQueue._add_to_history(video)
+    local url = options.backend_host .. ":" .. options.backend_port ..
+        "/add_video"
+    local current_date = os.date("%Y-%m-%d") -- Get the current date in YYYY-MM-DD format
+    local command = {
+        "curl", "-X", "POST", url, "-H", "Content-Type: application/json", "-d",
+        string.format(
+            '{"video_url": "%s", "video_name": "%s", "channel_url": "%s", "channel_name": "%s", "watch_date": "%s"}',
+            video.video_url, video.video_name, video.channel_url,
+            video.channel_name, current_date)
+    }
+    mp.command_native_async({
+        name = "subprocess",
+        playback_only = false,
+        capture_stdout = true,
+        args = command
+    }, function(success, result, err)
+        if not success then
+            print_osd_message("Failed to send video data to backend: " .. err,
+                MSG_DURATION, style.error)
+        end
+    end)
 end
 
 -- }}}
@@ -486,7 +512,7 @@ function YouTubeQueue.play_video(direction)
         mp.set_property_number("playlist-pos", index - 1)
     end
     YouTubeQueue.print_current_video()
-    sleep(MSG_DURATION)
+    YouTubeQueue._add_to_history(current_video)
 end
 
 -- add the video to the queue from the clipboard or call from script-message
