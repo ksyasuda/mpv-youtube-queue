@@ -59,6 +59,7 @@ local options = {
     show_errors = true,
     ytdlp_file_format = "mp4",
     ytdlp_output_template = "%(uploader)s/%(title)s.%(ext)s",
+    use_history_db = true,
     backend_host = "http://localhost",
     backend_port = "42069"
 }
@@ -208,7 +209,7 @@ local function _split_command(cmd)
     return components
 end
 
-function YouTubeQueue._add_to_history(video)
+function YouTubeQueue._add_to_history_db(video)
     local url = options.backend_host .. ":" .. options.backend_port ..
         "/add_video"
     local current_date = os.date("%Y-%m-%d") -- Get the current date in YYYY-MM-DD format
@@ -512,7 +513,9 @@ function YouTubeQueue.play_video(direction)
         mp.set_property_number("playlist-pos", index - 1)
     end
     YouTubeQueue.print_current_video()
-    YouTubeQueue._add_to_history(current_video)
+    if options.use_history_db then
+        YouTubeQueue._add_to_history_db(current_video)
+    end
 end
 
 -- add the video to the queue from the clipboard or call from script-message
