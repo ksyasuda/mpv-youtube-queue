@@ -114,7 +114,7 @@ local function surround_with_quotes(s)
     end
 end
 
-local function remove_quotes(s) return string.gsub(s, "'", "") end
+local function strip(s) return string.gsub(s, "['\n\r]", "") end
 
 -- run sleep shell command for n seconds
 local function sleep(n) os.execute("sleep " .. tonumber(n)) end
@@ -209,16 +209,15 @@ local function _split_command(cmd)
     return components
 end
 
-function YouTubeQueue._add_to_history_db(video)
+function YouTubeQueue._add_to_history_db(v)
+    if not options.use_history_db then return end
     local url = options.backend_host .. ":" .. options.backend_port ..
         "/add_video"
-    local current_date = os.date("%Y-%m-%d") -- Get the current date in YYYY-MM-DD format
     local command = {
         "curl", "-X", "POST", url, "-H", "Content-Type: application/json", "-d",
         string.format(
-            '{"video_url": "%s", "video_name": "%s", "channel_url": "%s", "channel_name": "%s", "watch_date": "%s"}',
-            video.video_url, video.video_name, video.channel_url,
-            video.channel_name, current_date)
+            '{"video_url": "%s", "video_name": "%s", "channel_url": "%s", "channel_name": "%s"}',
+            v.video_url, v.video_name, v.channel_url, v.channel_name)
     }
     mp.command_native_async({
         name = "subprocess",
@@ -229,8 +228,10 @@ function YouTubeQueue._add_to_history_db(video)
         if not success then
             print_osd_message("Failed to send video data to backend: " .. err,
                 MSG_DURATION, style.error)
+            return false
         end
     end)
+    return true
 end
 
 -- }}}
@@ -513,9 +514,7 @@ function YouTubeQueue.play_video(direction)
         mp.set_property_number("playlist-pos", index - 1)
     end
     YouTubeQueue.print_current_video()
-    if options.use_history_db then
-        YouTubeQueue._add_to_history_db(current_video)
-    end
+    -- YouTubeQueue._add_to_history_db(current_video)
 end
 
 -- add the video to the queue from the clipboard or call from script-message
@@ -538,7 +537,7 @@ function YouTubeQueue.add_to_queue(url, update_internal_playlist)
     local video, channel_url, channel_name, video_name
     if not is_file(url) then
         channel_url, channel_name, video_name = YouTubeQueue.get_video_info(url)
-        url = remove_quotes(url)
+        url = strip(url)
         if (channel_url == nil or channel_name == nil or video_name == nil) or
             (channel_url == "" or channel_name == "" or video_name == "") then
             print_osd_message("Error getting video info.", MSG_DURATION,
@@ -637,10 +636,13 @@ end
 
 -- LISTENERS {{{
 -- Function to be called when the end-file event is triggered
+-- This function is called when the current file ends or when moving to the
+-- next or previous item in the internal playlist
 local function on_end_file(event)
     if event.reason == "eof" then -- The file ended normally
         YouTubeQueue.update_current_index()
     end
+    YouTubeQueue._add_to_history_db(current_video)
 end
 
 -- Function to be called when the track-changed event is triggered
@@ -654,6 +656,7 @@ local function on_playback_restart()
     elseif current_video == nil then
         local url = mp.get_property("path")
         YouTubeQueue.add_to_queue(url)
+        YouTubeQueue._add_to_history_db(current_video)
     end
 end
 
