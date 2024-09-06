@@ -226,7 +226,7 @@ function YouTubeQueue._add_to_history_db(v)
         playback_only = false,
         capture_stdout = true,
         args = command
-    }, function(success, result, err)
+    }, function(success, _, err)
         if not success then
             print_osd_message("Failed to send video data to backend: " .. err,
                 MSG_DURATION, style.error)
