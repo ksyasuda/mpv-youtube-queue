@@ -29,7 +29,7 @@ local marked_index = nil
 local current_video = nil
 local destroyer = nil
 local timeout
-local debug = false
+local debug = true
 
 local options = {
     add_to_queue = "ctrl+a",
@@ -658,13 +658,18 @@ local function on_track_changed()
     YouTubeQueue.update_current_index()
 end
 
+local function on_file_loaded()
+    if debug then print("Load file event triggered.") end
+    YouTubeQueue.update_current_index(true)
+end
+
 -- Function to be called when the playback-restart event is triggered
 local function on_playback_restart()
     if debug then print("Playback restart event triggered.") end
     local playlist_size = mp.get_property_number("playlist-count", 0)
-    if current_video ~= nil and playlist_size > 1 then
-        YouTubeQueue.update_current_index(true)
-    elseif current_video == nil then
+    -- if current_video ~= nil and playlist_size > 1 then
+    -- YouTubeQueue.update_current_index()
+    if current_video == nil then
         local url = mp.get_property("path")
         YouTubeQueue.add_to_queue(url)
         YouTubeQueue._add_to_history_db(current_video)
@@ -707,6 +712,7 @@ mp.add_key_binding(options.remove_from_queue, "delete_video",
 mp.register_event("end-file", on_end_file)
 mp.register_event("track-changed", on_track_changed)
 mp.register_event("playback-restart", on_playback_restart)
+mp.register_event("file-loaded", on_file_loaded)
 
 -- keep for backwards compatibility
 mp.register_script_message("add_to_queue", YouTubeQueue.add_to_queue)
