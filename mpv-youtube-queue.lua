@@ -29,6 +29,7 @@ local marked_index = nil
 local current_video = nil
 local destroyer = nil
 local timeout
+local debug = false
 
 local options = {
     add_to_queue = "ctrl+a",
@@ -105,19 +106,17 @@ local style = {
 -- }}}
 
 -- HELPERS {{{
+
 -- surround string with single quotes if it does not already have them
 local function surround_with_quotes(s)
-    if string.sub(s, 0, 1) == "'" and string.sub(s, -1) == "'" then
-        return s
+    if string.sub(s, 0, 1) == '"' and string.sub(s, -1) == '"' then
+        return
     else
-        return "'" .. s .. "'"
+        return '"' .. s .. '"'
     end
 end
 
 local function strip(s) return string.gsub(s, "['\n\r]", "") end
-
--- run sleep shell command for n seconds
-local function sleep(n) os.execute("sleep " .. tonumber(n)) end
 
 local function print_osd_message(message, duration, s)
     if s == style.error and not options.show_errors then return end
@@ -131,8 +130,11 @@ end
 -- returns true if the provided path exists and is a file
 local function is_file(filepath)
     local result = utils.file_info(filepath)
-    if result == nil then return false end
-    return result.is_file
+    if debug and type(result) == "table" then
+        print("IS_FILE() check: " .. tostring(result.is_file))
+    end
+    if result == nil or type(result) ~= "table" then return false end
+    return true
 end
 
 -- returns the filename given a path (e.g. /home/user/file.txt -> file.txt)
@@ -210,7 +212,6 @@ local function _split_command(cmd)
 end
 
 function YouTubeQueue._add_to_history_db(v)
-    if not options.use_history_db then return end
     local url = options.backend_host .. ":" .. options.backend_port ..
         "/add_video"
     local command = {
@@ -294,8 +295,8 @@ end
 function YouTubeQueue.print_current_video()
     destroy()
     local current = current_video
-    if current and current.vidro_url and is_file(current.video_url) then
-        print_osd_message("Playing: " .. current.video_name, 3)
+    if current and current.vidro_url ~= "" and is_file(current.video_url) then
+        print_osd_message("Playing: " .. current.video_url, 3)
     else
         if current and current.video_url then
             print_osd_message("Playing: " .. current.video_name .. ' by ' ..
@@ -338,14 +339,19 @@ function YouTubeQueue.is_in_queue(url)
 end
 
 -- Function to find the index of the currently playing video
-function YouTubeQueue.update_current_index()
+function YouTubeQueue.update_current_index(update_history)
+    if debug then print("Updating current index") end
     if #video_queue == 0 then return end
+    if update_history == nil then update_history = false end
     local current_url = mp.get_property("path")
     for i, v in ipairs(video_queue) do
         if v.video_url == current_url then
             index = i
             selected_index = index
             current_video = YouTubeQueue.get_video_at(index)
+            if update_history then
+                YouTubeQueue._add_to_history_db(current_video)
+            end
             return
         end
     end
@@ -485,6 +491,7 @@ function YouTubeQueue.play_video_at(idx)
     end
     index = idx
     selected_index = idx
+    current_video = video_queue[index]
     mp.set_property_number("playlist-pos", index - 1) -- zero-based index
     YouTubeQueue.print_current_video()
     return current_video
@@ -514,7 +521,6 @@ function YouTubeQueue.play_video(direction)
         mp.set_property_number("playlist-pos", index - 1)
     end
     YouTubeQueue.print_current_video()
-    -- YouTubeQueue._add_to_history_db(current_video)
 end
 
 -- add the video to the queue from the clipboard or call from script-message
@@ -535,9 +541,9 @@ function YouTubeQueue.add_to_queue(url, update_internal_playlist)
     end
 
     local video, channel_url, channel_name, video_name
+    url = strip(url)
     if not is_file(url) then
         channel_url, channel_name, video_name = YouTubeQueue.get_video_info(url)
-        url = strip(url)
         if (channel_url == nil or channel_name == nil or video_name == nil) or
             (channel_url == "" or channel_name == "" or video_name == "") then
             print_osd_message("Error getting video info.", MSG_DURATION,
@@ -639,20 +645,24 @@ end
 -- This function is called when the current file ends or when moving to the
 -- next or previous item in the internal playlist
 local function on_end_file(event)
+    if debug then print("End file event triggered: " .. event.reason) end
     if event.reason == "eof" then -- The file ended normally
-        YouTubeQueue.update_current_index()
+        YouTubeQueue.update_current_index(true)
     end
-    YouTubeQueue._add_to_history_db(current_video)
 end
 
 -- Function to be called when the track-changed event is triggered
-local function on_track_changed() YouTubeQueue.update_current_index() end
+local function on_track_changed()
+    if debug then print("Track changed event triggered.") end
+    YouTubeQueue.update_current_index()
+end
 
 -- Function to be called when the playback-restart event is triggered
 local function on_playback_restart()
+    if debug then print("Playback restart event triggered.") end
     local playlist_size = mp.get_property_number("playlist-count", 0)
     if current_video ~= nil and playlist_size > 1 then
-        YouTubeQueue.update_current_index()
+        YouTubeQueue.update_current_index(true)
     elseif current_video == nil then
         local url = mp.get_property("path")
         YouTubeQueue.add_to_queue(url)
