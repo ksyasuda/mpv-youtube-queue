@@ -63,21 +63,20 @@ This script requires the following software to be installed on the system
 - `clipboard_command - xclip -o`: The command to use to get the contents of the clipboard
 - `cursor_icon - ➤`: The icon to use for the cursor
 - `display_limit - 10`: The maximum amount of videos to show on the OSD at once
-- `download_directory - ~/videos/YouTube`: The directory to use when
-  downloading a video
+- `download_directory - ~/videos/YouTube`: The directory to use when downloading a video
 - `download_quality 720p`: The maximum download quality
 - `downloader - curl`: The name of the program to use to download the video
 - `font_name - JetBrains Mono`: The name of the font to use
 - `font_size - 12`: Size of the font
-- `marked_icon - ⇅`: The icon to use to mark a video as ready to be moved in
-  the queue
+- `marked_icon - ⇅`: The icon to use to mark a video as ready to be moved in the queue
 - `menu_timeout - 5`: The number of seconds until the menu times out
 - `show_errors - yes`: Show error messages on the OSD
 - `ytdlp_file_format - mp4`: The preferred file format for downloaded videos
-- `ytdlp_output_template - %(uploader)s/%(title)s.%(ext)s`: The [yt-dlp output
-  template string](https://github.com/yt-dlp/yt-dlp#output-template)
-  - Full path with the default `download_directory`
-    is: `~/videos/YouTube/<uploader>/<title>.<ext>`
+- `ytdlp_output_template - %(uploader)s/%(title)s.%(ext)s`: The [yt-dlp output template string](https://github.com/yt-dlp/yt-dlp#output-template)
+  - Full path with the default `download_directory` is: `~/videos/YouTube/<uploader>/<title>.<ext>`
+- `use_history_db - no`: Enable watch history tracking through integration with [mpv-youtube-queue-server](https://gitea.suda.codes/sudacode/mpv-youtube-queue-server)
+- `backend_host`: ip or hostname of the backend server
+- `backend_port`: port to connect to for the backend server
 
 ## License
 
