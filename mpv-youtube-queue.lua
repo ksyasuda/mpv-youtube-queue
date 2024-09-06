@@ -60,7 +60,7 @@ local options = {
     show_errors = true,
     ytdlp_file_format = "mp4",
     ytdlp_output_template = "%(uploader)s/%(title)s.%(ext)s",
-    use_history_db = true,
+    use_history_db = false,
     backend_host = "http://localhost",
     backend_port = "42069"
 }
@@ -212,6 +212,7 @@ local function _split_command(cmd)
 end
 
 function YouTubeQueue._add_to_history_db(v)
+    if not options.use_history_db then return false end
     local url = options.backend_host .. ":" .. options.backend_port ..
         "/add_video"
     local command = {
