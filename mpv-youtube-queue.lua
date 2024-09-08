@@ -62,7 +62,9 @@ local options = {
     ytdlp_output_template = "%(uploader)s/%(title)s.%(ext)s",
     use_history_db = false,
     backend_host = "http://localhost",
-    backend_port = "42069"
+    backend_port = "42069",
+    save_queue = "ctrl+s",
+    load_queue = "ctrl+l"
 }
 mp.options.read_options(options, "mpv-youtube-queue")
 
@@ -234,6 +236,88 @@ function YouTubeQueue._add_to_history_db(v)
         end
     end)
     return true
+end
+
+-- Returns a list of URLs in the queue from index + 1 to the end
+function YouTubeQueue._get_urls(start_index)
+    if start_index < 0 or start_index + 1 >= #video_queue then return nil end
+    local urls = {}
+    for i = start_index + 1, #video_queue do
+        table.insert(urls, video_queue[i].video_url)
+    end
+    return urls
+end
+
+-- Converts to json
+function YouTubeQueue._convert_to_json(key, val)
+    if val == nil then return end
+    if type(val) ~= "table" then return "{" .. key .. ":" .. val .. "}" end
+    local json = string.format('{"%s": [', key)
+    for i, v in ipairs(val) do
+        json = json .. '"' .. v .. '"'
+        if i < #val then json = json .. ", " end
+    end
+    json = json .. "]}"
+    return json
+end
+
+-- Saves the remainder of the videos in the queue (all videos after the currently playing
+-- video) to the history database
+function YouTubeQueue.save_queue()
+    if not options.use_history_db then return false end
+    local url = options.backend_host .. ":" .. options.backend_port ..
+        "/save_queue"
+    local data = YouTubeQueue._convert_to_json("urls",
+        YouTubeQueue._get_urls(index))
+    if data == nil then
+        print_osd_message("Failed to save queue: No videos remaining in queue",
+            MSG_DURATION, style.error)
+        return false
+    end
+    if debug then print("Data: " .. data) end
+    local command = {
+        "curl", "-X", "POST", url, "-H", "Content-Type: application/json", "-d",
+        data
+    }
+    if debug then
+        print("Saving queue to history")
+        print("Command: " .. table.concat(command, " "))
+    end
+    mp.command_native_async({
+        name = "subprocess",
+        playback_only = false,
+        capture_stdout = true,
+        args = command
+    }, function(success, _, err)
+        if not success then
+            print_osd_message("Failed to save queue: " .. err, MSG_DURATION,
+                style.error)
+            return false
+        end
+    end)
+end
+
+-- loads the queue from the backend
+function YouTubeQueue.load_queue()
+    if not options.use_history_db then return false end
+    local url = options.backend_host .. ":" .. options.backend_port ..
+        "/load_queue"
+    local command = { "curl", "-X", "GET", url }
+
+    mp.command_native_async({
+        name = "subprocess",
+        playback_only = false,
+        capture_stdout = true,
+        args = command
+    }, function(success, result, err)
+        if not success then
+            print_osd_message("Failed to load queue: " .. err, MSG_DURATION,
+                style.error)
+            return false
+        else
+            for i in result do YouTubeQueue.add_to_queue(i) end
+        end
+    end)
 end
 
 -- }}}
@@ -708,6 +792,8 @@ mp.add_key_binding(options.move_video, "move_video",
     YouTubeQueue.mark_and_move_video)
 mp.add_key_binding(options.remove_from_queue, "delete_video",
     YouTubeQueue.remove_from_queue)
+mp.add_key_binding(options.save_queue, "save_queue", YouTubeQueue.save_queue)
+mp.add_key_binding(options.load_queue, "load_queue", YouTubeQueue.load_queue)
 
 mp.register_event("end-file", on_end_file)
 mp.register_event("track-changed", on_track_changed)
