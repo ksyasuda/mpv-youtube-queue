@@ -29,7 +29,7 @@ local marked_index = nil
 local current_video = nil
 local destroyer = nil
 local timeout
-local debug = true
+local debug = false
 
 local options = {
     add_to_queue = "ctrl+a",
@@ -361,7 +361,16 @@ function YouTubeQueue.get_clipboard_content()
         return nil
     end
 
-    return res.stdout
+    local content = res.stdout:match("^%s*(.-)%s*$") -- Trim leading/trailing spaces
+    if content:match("^https?://") then
+        return content
+    elseif content:match("^file://") or utils.file_info(content) then
+        return content
+    else
+        print_osd_message("Clipboard content is not a valid URL or file path",
+            MSG_DURATION, style.error)
+        return nil
+    end
 end
 
 function YouTubeQueue.get_video_info(url)
@@ -627,11 +636,7 @@ function YouTubeQueue.add_to_queue(url, update_internal_playlist)
     if update_internal_playlist == nil then update_internal_playlist = 0 end
     if url == nil or url == "" then
         url = YouTubeQueue.get_clipboard_content()
-        if url == nil or url == "" then
-            print_osd_message("Nothing found in the clipboard.", MSG_DURATION,
-                style.error)
-            return
-        end
+        if url == nil then return end
     end
     if YouTubeQueue.is_in_queue(url) then
         print_osd_message("Video already in queue.", MSG_DURATION, style.error)
@@ -763,9 +768,6 @@ end
 -- Function to be called when the playback-restart event is triggered
 local function on_playback_restart()
     if debug then print("Playback restart event triggered.") end
-    local playlist_size = mp.get_property_number("playlist-count", 0)
-    -- if current_video ~= nil and playlist_size > 1 then
-    -- YouTubeQueue.update_current_index()
     if current_video == nil then
         local url = mp.get_property("path")
         YouTubeQueue.add_to_queue(url)
