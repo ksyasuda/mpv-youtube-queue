@@ -29,6 +29,7 @@ local marked_index = nil
 local current_video = nil
 local destroyer = nil
 local timeout
+local debug = false
 
 local options = {
     add_to_queue = "ctrl+a",
@@ -58,7 +59,12 @@ local options = {
     menu_timeout = 5,
     show_errors = true,
     ytdlp_file_format = "mp4",
-    ytdlp_output_template = "%(uploader)s/%(title)s.%(ext)s"
+    ytdlp_output_template = "%(uploader)s/%(title)s.%(ext)s",
+    use_history_db = false,
+    backend_host = "http://localhost",
+    backend_port = "42069",
+    save_queue = "ctrl+s",
+    load_queue = "ctrl+l"
 }
 mp.options.read_options(options, "mpv-youtube-queue")
 
@@ -102,19 +108,17 @@ local style = {
 -- }}}
 
 -- HELPERS {{{
+
 -- surround string with single quotes if it does not already have them
 local function surround_with_quotes(s)
-    if string.sub(s, 0, 1) == "'" and string.sub(s, -1) == "'" then
-        return s
+    if string.sub(s, 0, 1) == '"' and string.sub(s, -1) == '"' then
+        return
     else
-        return "'" .. s .. "'"
+        return '"' .. s .. '"'
     end
 end
 
-local function remove_quotes(s) return string.gsub(s, "'", "") end
-
--- run sleep shell command for n seconds
-local function sleep(n) os.execute("sleep " .. tonumber(n)) end
+local function strip(s) return string.gsub(s, "['\n\r]", "") end
 
 local function print_osd_message(message, duration, s)
     if s == style.error and not options.show_errors then return end
@@ -128,8 +132,11 @@ end
 -- returns true if the provided path exists and is a file
 local function is_file(filepath)
     local result = utils.file_info(filepath)
-    if result == nil then return false end
-    return result.is_file
+    if debug and type(result) == "table" then
+        print("IS_FILE() check: " .. tostring(result.is_file))
+    end
+    if result == nil or type(result) ~= "table" then return false end
+    return true
 end
 
 -- returns the filename given a path (e.g. /home/user/file.txt -> file.txt)
@@ -206,6 +213,126 @@ local function _split_command(cmd)
     return components
 end
 
+function YouTubeQueue._add_to_history_db(v)
+    if not options.use_history_db then return false end
+    local url = options.backend_host .. ":" .. options.backend_port ..
+        "/add_video"
+    local command = {
+        "curl", "-X", "POST", url, "-H", "Content-Type: application/json", "-d",
+        string.format(
+            '{"video_url": "%s", "video_name": "%s", "channel_url": "%s", "channel_name": "%s"}',
+            v.video_url, v.video_name, v.channel_url, v.channel_name)
+    }
+    mp.command_native_async({
+        name = "subprocess",
+        playback_only = false,
+        capture_stdout = true,
+        args = command
+    }, function(success, _, err)
+        if not success then
+            print_osd_message("Failed to send video data to backend: " .. err,
+                MSG_DURATION, style.error)
+            return false
+        end
+    end)
+    return true
+end
+
+-- Returns a list of URLs in the queue from index + 1 to the end
+function YouTubeQueue._get_urls(start_index)
+    if start_index < 0 or start_index + 1 >= #video_queue then return nil end
+    local urls = {}
+    for i = start_index + 1, #video_queue do
+        table.insert(urls, video_queue[i].video_url)
+    end
+    return urls
+end
+
+-- Converts to json
+function YouTubeQueue._convert_to_json(key, val)
+    if val == nil then return end
+    if type(val) ~= "table" then return "{" .. key .. ":" .. val .. "}" end
+    local json = string.format('{"%s": [', key)
+    for i, v in ipairs(val) do
+        json = json .. '"' .. v .. '"'
+        if i < #val then json = json .. ", " end
+    end
+    json = json .. "]}"
+    return json
+end
+
+-- Saves the remainder of the videos in the queue (all videos after the currently playing
+-- video) to the history database
+function YouTubeQueue.save_queue()
+    if not options.use_history_db then return false end
+    local url = options.backend_host .. ":" .. options.backend_port ..
+        "/save_queue"
+    local data = YouTubeQueue._convert_to_json("urls",
+        YouTubeQueue._get_urls(index))
+    if data == nil then
+        print_osd_message("Failed to save queue: No videos remaining in queue",
+            MSG_DURATION, style.error)
+        return false
+    end
+    if debug then print("Data: " .. data) end
+    local command = {
+        "curl", "-X", "POST", url, "-H", "Content-Type: application/json", "-d",
+        data
+    }
+    if debug then
+        print("Saving queue to history")
+        print("Command: " .. table.concat(command, " "))
+    end
+    mp.command_native_async({
+        name = "subprocess",
+        playback_only = false,
+        capture_stdout = true,
+        args = command
+    }, function(success, _, err)
+        if not success then
+            print_osd_message("Failed to save queue: " .. err, MSG_DURATION,
+                style.error)
+            return false
+        end
+    end)
+end
+
+-- loads the queue from the backend
+function YouTubeQueue.load_queue()
+    if not options.use_history_db then return false end
+    local url = options.backend_host .. ":" .. options.backend_port ..
+        "/load_queue"
+    local command = { "curl", "-X", "GET", url }
+
+    mp.command_native_async({
+        name = "subprocess",
+        playback_only = false,
+        capture_stdout = true,
+        args = command
+    }, function(success, result, err)
+        if not success then
+            print_osd_message("Failed to load queue: " .. err, MSG_DURATION,
+                style.error)
+            return false
+        else
+            if result.status == 0 then
+                -- split urls based on commas
+                local urls = {}
+                -- Remove the brackets from json list
+                local l = result.stdout:sub(2, -3)
+                local item
+                for turl in l:gmatch('[^,]+') do
+                    item = turl:match("^%s*(.-)%s*$"):gsub('"', "'")
+                    table.insert(urls, item)
+                end
+                for _, turl in ipairs(urls) do
+                    YouTubeQueue.add_to_queue(turl)
+                end
+            end
+        end
+    end)
+end
+
 -- }}}
 
 -- QUEUE GETTERS AND SETTERS {{{
@@ -234,7 +361,16 @@ function YouTubeQueue.get_clipboard_content()
         return nil
     end
 
-    return res.stdout
+    local content = res.stdout:match("^%s*(.-)%s*$") -- Trim leading/trailing spaces
+    if content:match("^https?://") then
+        return content
+    elseif content:match("^file://") or utils.file_info(content) then
+        return content
+    else
+        print_osd_message("Clipboard content is not a valid URL or file path",
+            MSG_DURATION, style.error)
+        return nil
+    end
 end
 
 function YouTubeQueue.get_video_info(url)
@@ -266,8 +402,8 @@ end
 function YouTubeQueue.print_current_video()
     destroy()
     local current = current_video
-    if current and current.vidro_url and is_file(current.video_url) then
-        print_osd_message("Playing: " .. current.video_name, 3)
+    if current and current.vidro_url ~= "" and is_file(current.video_url) then
+        print_osd_message("Playing: " .. current.video_url, 3)
     else
         if current and current.video_url then
             print_osd_message("Playing: " .. current.video_name .. ' by ' ..
@@ -310,14 +446,19 @@ function YouTubeQueue.is_in_queue(url)
 end
 
 -- Function to find the index of the currently playing video
-function YouTubeQueue.update_current_index()
+function YouTubeQueue.update_current_index(update_history)
+    if debug then print("Updating current index") end
     if #video_queue == 0 then return end
+    if update_history == nil then update_history = false end
     local current_url = mp.get_property("path")
     for i, v in ipairs(video_queue) do
         if v.video_url == current_url then
             index = i
             selected_index = index
             current_video = YouTubeQueue.get_video_at(index)
+            if update_history then
+                YouTubeQueue._add_to_history_db(current_video)
+            end
             return
         end
     end
@@ -457,6 +598,7 @@ function YouTubeQueue.play_video_at(idx)
     end
     index = idx
     selected_index = idx
+    current_video = video_queue[index]
     mp.set_property_number("playlist-pos", index - 1) -- zero-based index
     YouTubeQueue.print_current_video()
     return current_video
@@ -486,7 +628,6 @@ function YouTubeQueue.play_video(direction)
         mp.set_property_number("playlist-pos", index - 1)
     end
     YouTubeQueue.print_current_video()
-    sleep(MSG_DURATION)
 end
 
 -- add the video to the queue from the clipboard or call from script-message
@@ -495,11 +636,7 @@ function YouTubeQueue.add_to_queue(url, update_internal_playlist)
     if update_internal_playlist == nil then update_internal_playlist = 0 end
     if url == nil or url == "" then
         url = YouTubeQueue.get_clipboard_content()
-        if url == nil or url == "" then
-            print_osd_message("Nothing found in the clipboard.", MSG_DURATION,
-                style.error)
-            return
-        end
+        if url == nil then return end
     end
     if YouTubeQueue.is_in_queue(url) then
         print_osd_message("Video already in queue.", MSG_DURATION, style.error)
@@ -507,9 +644,9 @@ function YouTubeQueue.add_to_queue(url, update_internal_playlist)
     end
 
     local video, channel_url, channel_name, video_name
+    url = strip(url)
     if not is_file(url) then
         channel_url, channel_name, video_name = YouTubeQueue.get_video_info(url)
-        url = remove_quotes(url)
         if (channel_url == nil or channel_name == nil or video_name == nil) or
             (channel_url == "" or channel_name == "" or video_name == "") then
             print_osd_message("Error getting video info.", MSG_DURATION,
@@ -608,23 +745,33 @@ end
 
 -- LISTENERS {{{
 -- Function to be called when the end-file event is triggered
+-- This function is called when the current file ends or when moving to the
+-- next or previous item in the internal playlist
 local function on_end_file(event)
+    if debug then print("End file event triggered: " .. event.reason) end
     if event.reason == "eof" then -- The file ended normally
-        YouTubeQueue.update_current_index()
+        YouTubeQueue.update_current_index(true)
     end
 end
 
 -- Function to be called when the track-changed event is triggered
-local function on_track_changed() YouTubeQueue.update_current_index() end
+local function on_track_changed()
+    if debug then print("Track changed event triggered.") end
+    YouTubeQueue.update_current_index()
+end
+
+local function on_file_loaded()
+    if debug then print("Load file event triggered.") end
+    YouTubeQueue.update_current_index(true)
+end
 
 -- Function to be called when the playback-restart event is triggered
 local function on_playback_restart()
-    local playlist_size = mp.get_property_number("playlist-count", 0)
-    if current_video ~= nil and playlist_size > 1 then
-        YouTubeQueue.update_current_index()
-    elseif current_video == nil then
+    if debug then print("Playback restart event triggered.") end
+    if current_video == nil then
         local url = mp.get_property("path")
         YouTubeQueue.add_to_queue(url)
+        YouTubeQueue._add_to_history_db(current_video)
     end
 end
 
@@ -660,10 +807,13 @@ mp.add_key_binding(options.move_video, "move_video",
     YouTubeQueue.mark_and_move_video)
 mp.add_key_binding(options.remove_from_queue, "delete_video",
     YouTubeQueue.remove_from_queue)
+mp.add_key_binding(options.save_queue, "save_queue", YouTubeQueue.save_queue)
+mp.add_key_binding(options.load_queue, "load_queue", YouTubeQueue.load_queue)
 
 mp.register_event("end-file", on_end_file)
 mp.register_event("track-changed", on_track_changed)
 mp.register_event("playback-restart", on_playback_restart)
+mp.register_event("file-loaded", on_file_loaded)
 
 -- keep for backwards compatibility
 mp.register_script_message("add_to_queue", YouTubeQueue.add_to_queue)
