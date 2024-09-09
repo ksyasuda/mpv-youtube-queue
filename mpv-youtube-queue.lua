@@ -315,7 +315,20 @@ function YouTubeQueue.load_queue()
                 style.error)
             return false
         else
-            for i in result do YouTubeQueue.add_to_queue(i) end
+            if result.status == 0 then
+                -- split urls based on commas
+                local urls = {}
+                -- Remove the brackets from json list
+                local l = result.stdout:sub(2, -3)
+                local item
+                for turl in l:gmatch('[^,]+') do
+                    item = turl:match("^%s*(.-)%s*$"):gsub('"', "'")
+                    table.insert(urls, item)
+                end
+                for _, turl in ipairs(urls) do
+                    YouTubeQueue.add_to_queue(turl)
+                end
+            end
         end
     end)
 end
