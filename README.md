@@ -43,6 +43,8 @@ This script requires the following software to be installed on the system
   in the queue
 - `move_cursor_down - ctrl+j`: Move the cursor down one row in the queue
 - `move_cursor_up - ctrl+k`- Move the cursor up one row in the queue
+- `load_queue - ctrl+l` - Appends the videos from the most recent save point to the
+  queue
 - `move_video - ctrl+m`: Mark/move the selected video in the queue
 - `play_next_in_queue - ctrl+n`: Play the next video in the queue
 - `open_video_in_browser - ctrl+o`: Open the currently playing video in the browser
@@ -52,6 +54,8 @@ This script requires the following software to be installed on the system
 - `print_current_video - ctrl+P`: Print the name and channel of the currently
   playing video to the OSD
 - `print_queue - ctrl+q`: Print the contents of the queue to the OSD
+- `save_queue - ctrl+s`: Saves the remainder of the queue (excluding the
+  currently playing video) to the database for retrevial at a later time
 - `remove_from_queue - ctrl+x`: Remove the currently selected video from the
   queue
 - `play_selected_video - ctrl+ENTER`: Play the currently selected video in
