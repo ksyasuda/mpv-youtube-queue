@@ -11,7 +11,7 @@ A Lua script that replicates and extends the YouTube "Add to Queue" feature for 
 ## Features
 
 - **Interactive Queue Management:** A menu-driven interface for adding, removing, and rearranging videos in your queue
-- **yt-dlp Integration:** Works with any link supported by [yt-dlp](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md "yd-dlp supported sites page") and supports downloading a supported video in the queue
+- **yt-dlp Integration:** Gathers video info and allows downloading with any link supported by [yt-dlp](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md "yd-dlp supported sites page")
 - **Internal Playlist Integration:** Seamlessly integrates with mpv's internal playlist for a unified playback experience
 - **Customizable Keybindings:** Assign your preferred hotkeys to interact with the currently playing video and queue
 
