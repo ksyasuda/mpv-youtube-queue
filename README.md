@@ -38,6 +38,10 @@ This script requires the following software to be installed on the system
 ### Default Keybindings
 
 - `add_to_queue - ctrl+a`: Add a video in the clipboard to the queue
+- `default_save_method - unwatched`: The default method to use when saving the
+  queue.  Valid options are `unwatched` or `all`.  Defaults to `unwatched`
+  - Whichever option is chosen is the default method for the `save_queue`
+    binding, and the other method will be bound to `save_queue_alt`
 - `download_current_video - ctrl+d`: Download the currently playing video
 - `download_selected_video - ctrl+D`: Download the currently selected video
   in the queue
@@ -54,8 +58,10 @@ This script requires the following software to be installed on the system
 - `print_current_video - ctrl+P`: Print the name and channel of the currently
   playing video to the OSD
 - `print_queue - ctrl+q`: Print the contents of the queue to the OSD
-- `save_queue - ctrl+s`: Saves the remainder of the queue (excluding the
-  currently playing video) to the database for retrevial at a later time
+- `save_queue - ctrl+s`: Saves the queue using the chosen method in
+  `default_save_method`
+- `save_queue_alt - ctrl+S`: Saves the queue using the method not chosen in
+  `default_save_method`
 - `remove_from_queue - ctrl+x`: Remove the currently selected video from the
   queue
 - `play_selected_video - ctrl+ENTER`: Play the currently selected video in
