@@ -64,6 +64,8 @@ local options = {
     backend_host = "http://localhost",
     backend_port = "42069",
     save_queue = "ctrl+s",
+    save_queue_alt = "ctrl+S",
+    default_save_method = "unwatched",
     load_queue = "ctrl+l"
 }
 mp.options.read_options(options, "mpv-youtube-queue")
@@ -240,7 +242,7 @@ end
 
 -- Returns a list of URLs in the queue from index + 1 to the end
 function YouTubeQueue._get_urls(start_index)
-    if start_index < 0 or start_index + 1 >= #video_queue then return nil end
+    if start_index < 0 or start_index > #video_queue then return nil end
     local urls = {}
     for i = start_index + 1, #video_queue do
         table.insert(urls, video_queue[i].video_url)
@@ -263,13 +265,14 @@ end
 
 -- Saves the remainder of the videos in the queue (all videos after the currently playing
 -- video) to the history database
-function YouTubeQueue.save_queue()
+function YouTubeQueue.save_queue(idx)
     if not options.use_history_db then return false end
+    if idx == nil then idx = index end
     local url = options.backend_host .. ":" .. options.backend_port ..
         "/save_queue"
     local data = YouTubeQueue._convert_to_json("urls",
-        YouTubeQueue._get_urls(index))
-    if data == nil then
+        YouTubeQueue._get_urls(idx))
+    if data == nil or data == '{"urls": []}' then
         print_osd_message("Failed to save queue: No videos remaining in queue",
             MSG_DURATION, style.error)
         return false
@@ -288,11 +291,20 @@ function YouTubeQueue.save_queue()
         playback_only = false,
         capture_stdout = true,
         args = command
-    }, function(success, _, err)
+    }, function(success, result, err)
         if not success then
             print_osd_message("Failed to save queue: " .. err, MSG_DURATION,
                 style.error)
             return false
+        end
+        if debug then print("Status: " .. result.status) end
+        if result.status == 0 then
+            if idx > 1 then
+                print_osd_message("Queue saved to history from index: " .. idx,
+                    MSG_DURATION)
+            else
+                print_osd_message("Queue saved to history.", MSG_DURATION)
+            end
         end
     end)
 end
@@ -328,6 +340,7 @@ function YouTubeQueue.load_queue()
                 for _, turl in ipairs(urls) do
                     YouTubeQueue.add_to_queue(turl)
                 end
+                print_osd_message("Loaded queue from history.", MSG_DURATION)
             end
         end
     end)
@@ -807,7 +820,20 @@ mp.add_key_binding(options.move_video, "move_video",
     YouTubeQueue.mark_and_move_video)
 mp.add_key_binding(options.remove_from_queue, "delete_video",
     YouTubeQueue.remove_from_queue)
-mp.add_key_binding(options.save_queue, "save_queue", YouTubeQueue.save_queue)
+mp.add_key_binding(options.save_queue, "save_queue", function()
+    if options.default_save_method == "unwatched" then
+        YouTubeQueue.save_queue(index)
+    else
+        YouTubeQueue.save_queue(1)
+    end
+end)
+mp.add_key_binding(options.save_queue_alt, "save_queue_alt", function()
+    if options.default_save_method == "unwatched" then
+        YouTubeQueue.save_queue(1)
+    else
+        YouTubeQueue.save_queue(index)
+    end
+end)
 mp.add_key_binding(options.load_queue, "load_queue", YouTubeQueue.load_queue)
 
 mp.register_event("end-file", on_end_file)
