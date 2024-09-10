@@ -38,10 +38,6 @@ This script requires the following software to be installed on the system
 ### Default Keybindings
 
 - `add_to_queue - ctrl+a`: Add a video in the clipboard to the queue
-- `default_save_method - unwatched`: The default method to use when saving the
-  queue.  Valid options are `unwatched` or `all`.  Defaults to `unwatched`
-  - Whichever option is chosen is the default method for the `save_queue`
-    binding, and the other method will be bound to `save_queue_alt`
 - `download_current_video - ctrl+d`: Download the currently playing video
 - `download_selected_video - ctrl+D`: Download the currently selected video
   in the queue
@@ -69,6 +65,10 @@ This script requires the following software to be installed on the system
 
 ### Default Options
 
+- `default_save_method - unwatched`: The default method to use when saving the
+  queue.  Valid options are `unwatched` or `all`.  Defaults to `unwatched`
+  - Whichever option is chosen is the default method for the `save_queue`
+    binding, and the other method will be bound to `save_queue_alt`
 - `browser - firefox`: The browser to use when opening a video or channel page
 - `clipboard_command - xclip -o`: The command to use to get the contents of the clipboard
 - `cursor_icon - ➤`: The icon to use for the cursor
