@@ -387,6 +387,7 @@ function YouTubeQueue.get_clipboard_content()
 end
 
 function YouTubeQueue.get_video_info(url)
+    print_osd_message("Getting video info...", MSG_DURATION * 2)
     local res = mp.command_native({
         name = "subprocess",
         playback_only = false,
@@ -408,6 +409,8 @@ function YouTubeQueue.get_video_info(url)
         print_osd_message("Failed to get video info", MSG_DURATION, style.error)
         return nil
     end
+
+    destroy()
 
     return channel_url, uploader, title
 end
@@ -525,6 +528,7 @@ end
 
 function YouTubeQueue.print_queue(duration)
     timeout:kill()
+    mp.set_osd_ass(0, 0, "")
     timeout:resume()
     local ass = assdraw.ass_new()
     local current_index = index
