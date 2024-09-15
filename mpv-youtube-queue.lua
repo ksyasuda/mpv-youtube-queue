@@ -240,7 +240,7 @@ function YouTubeQueue._add_to_history_db(v)
     return true
 end
 
--- Returns a list of URLs in the queue from index + 1 to the end
+-- Returns a list of URLs in the queue from start_index to the end
 function YouTubeQueue._get_urls(start_index)
     if start_index < 0 or start_index > #video_queue then return nil end
     local urls = {}
@@ -271,7 +271,7 @@ function YouTubeQueue.save_queue(idx)
     local url = options.backend_host .. ":" .. options.backend_port ..
         "/save_queue"
     local data = YouTubeQueue._convert_to_json("urls",
-        YouTubeQueue._get_urls(idx))
+        YouTubeQueue._get_urls(idx + 1))
     if data == nil or data == '{"urls": []}' then
         print_osd_message("Failed to save queue: No videos remaining in queue",
             MSG_DURATION, style.error)
@@ -828,12 +828,12 @@ mp.add_key_binding(options.save_queue, "save_queue", function()
     if options.default_save_method == "unwatched" then
         YouTubeQueue.save_queue(index)
     else
-        YouTubeQueue.save_queue(1)
+        YouTubeQueue.save_queue(0)
     end
 end)
 mp.add_key_binding(options.save_queue_alt, "save_queue_alt", function()
     if options.default_save_method == "unwatched" then
-        YouTubeQueue.save_queue(1)
+        YouTubeQueue.save_queue(0)
     else
         YouTubeQueue.save_queue(index)
     end
