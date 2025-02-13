@@ -111,17 +111,52 @@ local style = {
 
 -- HELPERS {{{
 
--- surround string with single quotes if it does not already have them
+--- surround string with single quotes if it does not already have them
+--- @param s string - the string to surround with quotes
+--- @return string | nil - the string surrounded with quotes
 local function surround_with_quotes(s)
     if string.sub(s, 0, 1) == '"' and string.sub(s, -1) == '"' then
-        return
+        return nil
     else
         return '"' .. s .. '"'
     end
 end
 
+--- Truncate a string to a maximum length, adding an ellipsis if truncated
+--- @param str string The string to truncate
+--- @param length number The maximum length
+--- @param use_ellipsis? boolean Whether to add "..." (defaults to true)
+--- @return string truncated The truncated string
+local function truncate_string(str, length, use_ellipsis)
+    if use_ellipsis == nil then use_ellipsis = true end
+    if #str <= length then return str end
+
+    local truncated = string.sub(str, 1, length)
+    if use_ellipsis then
+        -- Remove last 3 chars to make room for ellipsis
+        truncated = string.sub(truncated, 1, length - 3) .. "..."
+    end
+    return truncated
+end
+
+--- return true if the input is false, nil, empty, or 0
+--- @param s string - the input to check for nullity
+--- @return boolean - true if the input is null, false otherwise
+local function isnull(s)
+    if not s or s == nil or s == "" or s == 0 or s == {} then
+        return true
+    else
+        return false
+    end
+end
+
+-- remove single quotes, newlines, and carriage returns from a string
 local function strip(s) return string.gsub(s, "['\n\r]", "") end
 
+-- print a message to the OSD
+---@param message string - the message to print
+---@param duration number - the duration to display the message
+---@param s string - the style to use for the message
 local function print_osd_message(message, duration, s)
     if s == style.error and not options.show_errors then return end
     destroy()
@@ -131,7 +166,9 @@ local function print_osd_message(message, duration, s)
         duration)
 end
 
--- returns true if the provided path exists and is a file
+---returns true if the provided path exists and is a file
+---@param filepath string - the path to check
+---@return boolean - true if the path is a file, false otherwise
 local function is_file(filepath)
     local result = utils.file_info(filepath)
     if debug and type(result) == "table" then
@@ -141,11 +178,16 @@ local function is_file(filepath)
     return true
 end
 
--- returns the filename given a path (e.g. /home/user/file.txt -> file.txt)
+---returns the filename given a path (eg. /home/user/file.txt -> file.txt)
+---@param filepath string - the path to extract the filename from
+---@return string | nil - the filename
 local function split_path(filepath)
     if is_file(filepath) then return utils.split_path(filepath) end
 end
 
+--- returns the expanded path of a file. eg. ~/file.txt -> /home/user/file.txt
+--- @param path string - the path to expand
+--- @return string - the expanded path
 local function expanduser(path)
     -- remove trailing slash if it exists
     if string.sub(path, -1) == "/" then path = string.sub(path, 1, -2) end
@@ -161,23 +203,28 @@ local function expanduser(path)
     end
 end
 
+---Open a URL in the browser
+---@param url string
 local function open_url_in_browser(url)
     local command = options.browser .. " " .. surround_with_quotes(url)
     os.execute(command)
 end
 
+--- Opens the current video in the browser
 local function open_video_in_browser()
     if current_video and current_video.video_url then
         open_url_in_browser(current_video.video_url)
     end
 end
 
+--- Opens the channel of the current video in the browser
 local function open_channel_in_browser()
     if current_video and current_video.channel_url then
         open_url_in_browser(current_video.channel_url)
     end
 end
 
+-- Internal function to print the contents of the internal playlist to the console
 local function _print_internal_playlist()
     local count = mp.get_property_number("playlist-count")
     print("Playlist contents:")
@@ -187,6 +234,12 @@ local function _print_internal_playlist()
     end
 end
 
+--- Helper function to build the OSD row for the queue
+local function _build_osd_row(prefix, s, i, title, channel_name)
+    return prefix .. s .. i .. ". " .. title .. " - (" .. channel_name .. ")"
+end
+
+--- Toggle queue visibility
 local function toggle_print()
     if destroyer ~= nil then
         destroyer()
@@ -207,7 +260,9 @@ local function _remove_command_quotes(s)
     end
 end
 
--- Function to split the clipboard_command into it's parts and return as a table
+--- Function to split the clipboard_command into it's parts and return as a table
+--- @param cmd string - the command to split
+--- @return table - the split command as a table
 local function _split_command(cmd)
     local components = {}
     for arg in cmd:gmatch("%S+") do table.insert(components, arg) end
@@ -215,6 +270,9 @@ local function _split_command(cmd)
     return components
 end
 
+--- Add a video to the history database
+--- @param v table - the video to add to the history database
+--- @return boolean - true if the video was added successfully, false otherwise
 function YouTubeQueue._add_to_history_db(v)
     if not options.use_history_db then return false end
     local url = options.backend_host .. ":" .. options.backend_port ..
@@ -222,8 +280,9 @@ function YouTubeQueue._add_to_history_db(v)
     local command = {
         "curl", "-X", "POST", url, "-H", "Content-Type: application/json", "-d",
         string.format(
-            '{"video_url": "%s", "video_name": "%s", "channel_url": "%s", "channel_name": "%s"}',
-            v.video_url, v.video_name, v.channel_url, v.channel_name)
+            '{"video_url": "%s", "title": "%s", "channel_url": "%s", "channel_name": "%s"}',
+            v.video_url, v.title, v.channel_url, v.channel_name
+        )
     }
     mp.command_native_async({
         name = "subprocess",
@@ -240,7 +299,9 @@ function YouTubeQueue._add_to_history_db(v)
     return true
 end
 
--- Returns a list of URLs in the queue from start_index to the end
+--- Returns a list of URLs in the queue from start_index to the end
+--- @param start_index number - the index to start from
+--- @return table | nil - a table of URLs
 function YouTubeQueue._get_urls(start_index)
     if start_index < 0 or start_index > #video_queue then return nil end
     local urls = {}
@@ -250,7 +311,10 @@ function YouTubeQueue._get_urls(start_index)
     return urls
 end
 
--- Converts to json
+--- Converts key value pairs to a json string
+--- @param key any - json key
+--- @param val any - json value
+--- @return string | nil - the json string
 function YouTubeQueue._convert_to_json(key, val)
     if val == nil then return end
     if type(val) ~= "table" then return "{" .. key .. ":" .. val .. "}" end
@@ -263,8 +327,9 @@ function YouTubeQueue._convert_to_json(key, val)
     return json
 end
 
--- Saves the remainder of the videos in the queue (all videos after the currently playing
--- video) to the history database
+--- Saves the remainder of the videos in the queue (all videos after the currently playing video) to the history database
+--- @param idx number - the index to start saving from
+--- @return boolean - true if the queue was saved successfully, false otherwise
 function YouTubeQueue.save_queue(idx)
     if not options.use_history_db then return false end
     if idx == nil then idx = index end
@@ -307,6 +372,7 @@ function YouTubeQueue.save_queue(idx)
             end
         end
     end)
+    return true
 end
 
 -- loads the queue from the backend
@@ -338,7 +404,7 @@ function YouTubeQueue.load_queue()
                     table.insert(urls, item)
                 end
                 for _, turl in ipairs(urls) do
-                    YouTubeQueue.add_to_queue(turl)
+                    YouTubeQueue.add_to_queue(turl, 0)
                 end
                 print_osd_message("Loaded queue from history.", MSG_DURATION)
             end
@@ -350,6 +416,9 @@ end
 
 -- QUEUE GETTERS AND SETTERS {{{
 
+--- Gets the video at the specified index
+--- @param idx number - the index of the video to get
+--- @return table | nil - the video at the specified index
 function YouTubeQueue.get_video_at(idx)
     if idx <= 0 or idx > #video_queue then
         print_osd_message("Invalid video index", MSG_DURATION, style.error)
@@ -359,6 +428,7 @@ function YouTubeQueue.get_video_at(idx)
 end
 
 -- returns the content of the clipboard
+-- @return string - the content of the clipboard
 function YouTubeQueue.get_clipboard_content()
     local command = _split_command(options.clipboard_command)
     local res = mp.command_native({
@@ -386,6 +456,9 @@ function YouTubeQueue.get_clipboard_content()
     end
 end
 
+-- Function to get the video info from the URL
+-- @param url string - the URL to get the video info from
+-- @return string, string, string - the channel URL, channel name, and title of the video
 function YouTubeQueue.get_video_info(url)
     print_osd_message("Getting video info...", MSG_DURATION * 2)
     local res = mp.command_native({
@@ -393,28 +466,46 @@ function YouTubeQueue.get_video_info(url)
         playback_only = false,
         capture_stdout = true,
         args = {
-            "yt-dlp", "--print", "channel_url", "--print", "uploader",
-            "--print", "title", "--playlist-items", "1", url
+            "yt-dlp", "--dump-single-json", "--ignore-config", "--no-warnings",
+            "--skip-download", "--playlist-items", "1", url
         }
     })
 
-    if res.status ~= 0 then
-        print_osd_message("Failed to get video info", MSG_DURATION, style.error)
+    if res.status ~= 0 or isnull(res.stdout) then
+        print_osd_message("Failed to get video info (yt-dlp error)",
+            MSG_DURATION, style.error)
+        print("yt-dlp status: " .. res.status)
         return nil
     end
 
-    local channel_url, uploader, title = res.stdout:match("(.*)\n(.*)\n(.*)\n")
-    if channel_url == nil or uploader == nil or title == nil or channel_url ==
-        "" or uploader == "" or title == "" then
-        print_osd_message("Failed to get video info", MSG_DURATION, style.error)
+    local data = utils.parse_json(res.stdout)
+    if isnull(data) then
+        print_osd_message("Failed to parse JSON from yt-dlp", MSG_DURATION,
+            style.error)
         return nil
     end
 
-    destroy()
+    local info = {
+        channel_url = data.channel_url or "",
+        channel_name = data.uploader or "",
+        title = data.title or "",
+        view_count = data.view_count or "",
+        upload_date = data.upload_date or "",
+        description = data.description or ""
+    }
 
-    return channel_url, uploader, title
+    if isnull(info.channel_url) or isnull(info.channel_name) or
+        isnull(info.title) then
+        print_osd_message(
+            "Missing metadata (channel_url, uploader, title) in JSON",
+            MSG_DURATION, style.error)
+        return nil
+    end
+
+    return info
 end
 
+--- Prints the currently playing video to the OSD
 function YouTubeQueue.print_current_video()
     destroy()
     local current = current_video
@@ -422,7 +513,7 @@ function YouTubeQueue.print_current_video()
         print_osd_message("Playing: " .. current.video_url, 3)
     else
         if current and current.video_url then
-            print_osd_message("Playing: " .. current.video_name .. ' by ' ..
+            print_osd_message("Playing: " .. current.title .. ' by ' ..
                 current.channel_name, 3)
         end
     end
@@ -432,9 +523,10 @@ end
 
 -- QUEUE FUNCTIONS {{{
 
--- Function to set the next or previous video in the queue as the current video
--- direction can be "NEXT" or "PREV".  If nil, "next" is assumed
--- Returns nil if there are no more videos in the queue
+--- Function to set the next or previous video in the queue as the current video
+--- direction can be "NEXT" or "PREV".  If nil, "next" is assumed
+--- @param direction string - the direction to move in the queue
+--- @return table | nil - the video at the new index
 function YouTubeQueue.set_video(direction)
     local amt
     direction = string.upper(direction)
@@ -454,6 +546,9 @@ function YouTubeQueue.set_video(direction)
     return current_video
 end
 
+--- Function to check if a video is in the queue
+--- @param url string - the URL to check
+--- @return boolean - true if the video is in the queue, false otherwise
 function YouTubeQueue.is_in_queue(url)
     for _, v in ipairs(video_queue) do
         if v.video_url == url then return true end
@@ -461,7 +556,9 @@ function YouTubeQueue.is_in_queue(url)
     return false
 end
 
--- Function to find the index of the currently playing video
+--- Function to find the index of the currently playing video
+--- @param update_history boolean - whether to update the history database
+--- @return number | nil - the index of the currently playing video
 function YouTubeQueue.update_current_index(update_history)
     if debug then print("Updating current index") end
     if #video_queue == 0 then return end
@@ -471,6 +568,7 @@ function YouTubeQueue.update_current_index(update_history)
         if v.video_url == current_url then
             index = i
             selected_index = index
+            ---@class table
             current_video = YouTubeQueue.get_video_at(index)
             if update_history then
                 YouTubeQueue._add_to_history_db(current_video)
@@ -482,12 +580,16 @@ function YouTubeQueue.update_current_index(update_history)
     index = 0
 end
 
+--- Function to mark and move a video in the queue
+--- If no video is marked, the currently selected video is marked
+--- If a video is marked, it is moved to the selected position
 function YouTubeQueue.mark_and_move_video()
     if marked_index == nil and selected_index ~= index then
         -- Mark the currently selected video for moving
         marked_index = selected_index
     else
         -- Move the previously marked video to the selected position
+        ---@diagnostic disable-next-line: param-type-mismatch
         YouTubeQueue.reorder_queue(marked_index, selected_index)
         -- print_osd_message("Video moved to the selected position.", 1.5)
         marked_index = nil -- Reset the marked index
@@ -496,6 +598,9 @@ function YouTubeQueue.mark_and_move_video()
     YouTubeQueue.print_queue()
 end
 
+--- Function to reorder the queue
+--- @param from_index number - the index to move from
+--- @param to_index number - the index to move to
 function YouTubeQueue.reorder_queue(from_index, to_index)
     if from_index == to_index or to_index == index then
         print_osd_message("No changes made.", 1.5)
@@ -526,6 +631,7 @@ function YouTubeQueue.reorder_queue(from_index, to_index)
     end
 end
 
+--- Prints the queue to the OSD
 function YouTubeQueue.print_queue(duration)
     timeout:kill()
     mp.set_osd_ass(0, 0, "")
@@ -554,22 +660,23 @@ function YouTubeQueue.print_queue(duration)
                 options.cursor_icon .. "\\h" .. style.reset or
                 "\\h\\h\\h"
             if i == current_index and i == selected_index then
-                message = prefix .. style.hover_selected .. i .. ". " ..
-                    video_queue[i].video_name .. " - (" ..
-                    video_queue[i].channel_name .. ")" .. style.reset
+                message = _build_osd_row(prefix, style.hover_selected, i,
+                    video_queue[i].title,
+                    video_queue[i].channel_name)
             elseif i == current_index then
-                message = prefix .. style.selected .. i .. ". " ..
-                    video_queue[i].video_name .. " - (" ..
-                    video_queue[i].channel_name .. ")" .. style.reset
+                message = _build_osd_row(prefix, style.selected, i,
+                    video_queue[i].title,
+                    video_queue[i].channel_name)
             elseif i == selected_index then
-                message = prefix .. style.hover .. i .. ". " ..
-                    video_queue[i].video_name .. " - (" ..
-                    video_queue[i].channel_name .. ")" .. style.reset
+                message = _build_osd_row(prefix, style.hover, i,
+                    video_queue[i].title,
+                    video_queue[i].channel_name)
             else
-                message = prefix .. style.reset .. i .. ". " ..
-                    video_queue[i].video_name .. " - (" ..
-                    video_queue[i].channel_name .. ")" .. style.reset
+                message = _build_osd_row(prefix, style.reset, i,
+                    video_queue[i].title,
+                    video_queue[i].channel_name)
             end
+            message = message .. style.reset
             if i == marked_index then
                 message =
                     message .. " " .. style.marked .. options.marked_icon ..
@@ -590,6 +697,8 @@ function YouTubeQueue.print_queue(duration)
     destroyer = destroy
 end
 
+--- Function to move the cursor on the OSD by amt
+--- @param amt number - the number of steps to take
 function YouTubeQueue.move_cursor(amt)
     timeout:kill()
     timeout:resume()
@@ -608,6 +717,7 @@ function YouTubeQueue.move_cursor(amt)
     YouTubeQueue.print_queue()
 end
 
+--- play the video at the current index
 function YouTubeQueue.play_video_at(idx)
     if idx <= 0 or idx > #video_queue then
         print_osd_message("Invalid video index", MSG_DURATION, style.error)
@@ -621,7 +731,9 @@ function YouTubeQueue.play_video_at(idx)
     return current_video
 end
 
--- play the next video in the queue
+--- play the next video in the queue
+--- @param direction string - the direction to move in the queue
+--- @return table | nil - the video at the new index
 function YouTubeQueue.play_video(direction)
     direction = string.upper(direction)
     local video = YouTubeQueue.set_video(direction)
@@ -647,11 +759,15 @@ function YouTubeQueue.play_video(direction)
     YouTubeQueue.print_current_video()
 end
 
--- add the video to the queue from the clipboard or call from script-message
--- updates the internal playlist by default, pass 0 to disable
+--- add the video to the queue from the clipboard or call from script-message
+--- updates the internal playlist by default, pass 0 to disable
+--- @param url string - the URL to add to the queue
+--- @param update_internal_playlist number - whether to update the internal playlist
+--- @return table | nil - the video added to the queue
 function YouTubeQueue.add_to_queue(url, update_internal_playlist)
     if update_internal_playlist == nil then update_internal_playlist = 0 end
     if url == nil or url == "" then
+        --- @class string
         url = YouTubeQueue.get_clipboard_content()
         if url == nil then return end
     end
@@ -660,34 +776,25 @@ function YouTubeQueue.add_to_queue(url, update_internal_playlist)
         return
     end
 
-    local video, channel_url, channel_name, video_name
+    local video, channel_url, title
     url = strip(url)
     if not is_file(url) then
-        channel_url, channel_name, video_name = YouTubeQueue.get_video_info(url)
-        if (channel_url == nil or channel_name == nil or video_name == nil) or
-            (channel_url == "" or channel_name == "" or video_name == "") then
-            print_osd_message("Error getting video info.", MSG_DURATION,
-                style.error)
-            return
-        else
-            video = {
-                video_url = url,
-                video_name = video_name,
-                channel_url = channel_url,
-                channel_name = channel_name
-            }
-        end
+        local info = YouTubeQueue.get_video_info(url)
+        if info == nil then return nil end
+        title = info.title
+        video = info
+        video["video_url"] = url
     else
-        channel_url, video_name = split_path(url)
-        if channel_url == nil or video_name == nil or channel_url == "" or
-            video_name == "" then
+        channel_url, title = split_path(url)
+        if channel_url == nil or title == nil or channel_url == "" or title ==
+            "" then
             print_osd_message("Error getting video info.", MSG_DURATION,
                 style.error)
             return
         end
         video = {
             video_url = url,
-            video_name = video_name,
+            title = title,
             channel_url = channel_url,
             channel_name = "Local file"
         }
@@ -701,22 +808,25 @@ function YouTubeQueue.add_to_queue(url, update_internal_playlist)
     elseif update_internal_playlist == 0 then
         mp.commandv("loadfile", url, "append-play")
     end
-    print_osd_message("Added " .. video_name .. " to queue.", MSG_DURATION)
+    print_osd_message("Added " .. title .. " to queue.", MSG_DURATION)
 end
 
+--- Downloads the video at the specified index
+--- @param idx number - the index of the video to download
+--- @return boolean - true if the video was downloaded successfully, false otherwise
 function YouTubeQueue.download_video_at(idx)
-    if idx < 0 or idx > #video_queue then return end
+    if idx < 0 or idx > #video_queue then return false end
     local v = video_queue[idx]
     if is_file(v.video_url) then
         print_osd_message("Current video is a local file... doing nothing.",
             MSG_DURATION, style.error)
-        return
+        return false
     end
     local o = options
     local q = o.download_quality:sub(1, -2)
     local dl_dir = expanduser(o.download_directory)
 
-    print_osd_message("Downloading " .. v.video_name .. "...", MSG_DURATION)
+    print_osd_message("Downloading " .. v.title .. "...", MSG_DURATION)
     -- Run the download command
     mp.command_native_async({
         name = "subprocess",
@@ -732,30 +842,34 @@ function YouTubeQueue.download_video_at(idx)
         }
     }, function(success, _, err)
         if success then
-            print_osd_message("Finished downloading " .. v.video_name .. ".",
+            print_osd_message("Finished downloading " .. v.title .. ".",
                 MSG_DURATION)
         else
-            print_osd_message("Error downloading " .. v.video_name .. ": " ..
-                err, MSG_DURATION, style.error)
+            print_osd_message("Error downloading " .. v.title .. ": " .. err,
+                MSG_DURATION, style.error)
         end
     end)
+    return true
 end
 
+--- Removes the video at the selected index from the queue
+--- @return boolean - true if the video was removed successfully, false otherwise
 function YouTubeQueue.remove_from_queue()
     if index == selected_index then
         print_osd_message("Cannot remove current video", MSG_DURATION,
             style.error)
-        return
+        return false
     end
     table.remove(video_queue, selected_index)
     mp.commandv("playlist-remove", selected_index - 1)
-    if current_video and current_video.video_name then
-        print_osd_message("Deleted " .. current_video.video_name ..
-            " from queue.", MSG_DURATION)
+    if current_video and current_video.title then
+        print_osd_message("Deleted " .. current_video.title .. " from queue.",
+            MSG_DURATION)
     end
     if selected_index > 1 then selected_index = selected_index - 1 end
     index = index - 1
     YouTubeQueue.print_queue()
+    return true
 end
 
 -- }}}
@@ -788,6 +902,7 @@ local function on_playback_restart()
     if current_video == nil then
         local url = mp.get_property("path")
         YouTubeQueue.add_to_queue(url)
+        ---@diagnostic disable-next-line: param-type-mismatch
         YouTubeQueue._add_to_history_db(current_video)
     end
 end
