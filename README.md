@@ -66,7 +66,7 @@ This script requires the following software to be installed on the system
 ### Default Options
 
 - `default_save_method - unwatched`: The default method to use when saving the
-  queue.  Valid options are `unwatched` or `all`.  Defaults to `unwatched`
+  queue. Valid options are `unwatched` or `all`. Defaults to `unwatched`
   - Whichever option is chosen is the default method for the `save_queue`
     binding, and the other method will be bound to `save_queue_alt`
 - `browser - firefox`: The browser to use when opening a video or channel page
@@ -84,7 +84,7 @@ This script requires the following software to be installed on the system
 - `ytdlp_file_format - mp4`: The preferred file format for downloaded videos
 - `ytdlp_output_template - %(uploader)s/%(title)s.%(ext)s`: The [yt-dlp output template string](https://github.com/yt-dlp/yt-dlp#output-template)
   - Full path with the default `download_directory` is: `~/videos/YouTube/<uploader>/<title>.<ext>`
-- `use_history_db - no`: Enable watch history tracking through integration with [mpv-youtube-queue-server](https://gitea.suda.codes/sudacode/mpv-youtube-queue-server)
+- `use_history_db - no`: Enable watch history tracking and remote video queuing through integration with [mpv-youtube-queue-server](https://gitea.suda.codes/sudacode/mpv-youtube-queue-server)
 - `backend_host`: ip or hostname of the backend server
 - `backend_port`: port to connect to for the backend server
 
