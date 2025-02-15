@@ -29,7 +29,7 @@ local marked_index = nil
 local current_video = nil
 local destroyer = nil
 local timeout
-local debug = true
+local debug = false
 
 local options = {
 	add_to_queue = "ctrl+a",
