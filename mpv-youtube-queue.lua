@@ -421,15 +421,21 @@ function YouTubeQueue.get_video_info(url)
 		return nil
 	end
 
+	local category = nil
+	if data.categories then
+		category = data.categories[1]
+	else
+		category = "Unknown"
+	end
 	local info = {
 		channel_url = data.channel_url or "",
 		channel_name = data.uploader or "",
 		video_name = data.title or "",
 		view_count = data.view_count or "",
 		upload_date = data.upload_date or "",
-		category = data.categories[1] or "",
+		category = category or "",
 		thumbnail_url = data.thumbnail or "",
-		subscribers = data.channel_follower_count or "",
+		subscribers = data.channel_follower_count or 0,
 	}
 
 	if isnull(info.channel_url) or isnull(info.channel_name) or isnull(info.video_name) then
@@ -844,6 +850,7 @@ function YouTubeQueue.add_to_history_db(v)
 		print("Adding video to history")
 		print("Command: " .. table.concat(command, " "))
 	end
+	print_osd_message("Adding video to history...", MSG_DURATION)
 	mp.command_native_async({
 		name = "subprocess",
 		playback_only = false,
@@ -855,6 +862,7 @@ function YouTubeQueue.add_to_history_db(v)
 			return false
 		end
 	end)
+	print_osd_message("Video added to history db", MSG_DURATION)
 	return true
 end
 
