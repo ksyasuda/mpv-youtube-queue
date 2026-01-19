@@ -31,6 +31,11 @@ local destroyer = nil
 local timeout
 local debug = false
 
+-- LRU cache for video info with bounded size
+local VIDEO_INFO_CACHE_MAX_SIZE = 100
+local video_info_cache = {}
+local video_info_cache_order = {} -- Tracks access order for LRU eviction
+
 local options = {
 	add_to_queue = "ctrl+a",
 	download_current_video = "ctrl+d",
@@ -67,6 +72,8 @@ local options = {
 	save_queue_alt = "ctrl+S",
 	default_save_method = "unwatched",
 	load_queue = "ctrl+l",
+	-- Title truncation
+	max_title_length = 60,
 }
 mp.options.read_options(options, "mpv-youtube-queue")
 
@@ -79,15 +86,16 @@ end
 timeout = mp.add_periodic_timer(options.menu_timeout, destroy)
 
 -- STYLE {{{
+-- Catppuccin Macchiato color palette (BGR format for ASS)
 local colors = {
-	error = "676EFF",
-	selected = "F993BD",
-	hover_selected = "FAA9CA",
-	cursor = "FDE98B",
-	header = "8CFAF1",
-	hover = "F2F8F8",
-	text = "BFBFBF",
-	marked = "C679FF",
+	error = "9687ED",      -- Red (#ed8796)
+	selected = "F5BDE6",   -- Pink (#f5bde6)
+	hover_selected = "C6C6F0", -- Flamingo (#f0c6c6)
+	cursor = "9FD4EE",     -- Yellow (#eed49f)
+	header = "CAD58B",     -- Teal (#8bd5ca)
+	hover = "F8BDB7",      -- Lavender (#b7bdf8)
+	text = "E0C0B8",       -- Subtext1 (#b8c0e0)
+	marked = "F6A0C6",     -- Mauve (#c6a0f6)
 }
 
 local notransparent = "\\alpha&H00&"
@@ -116,6 +124,69 @@ local style = {
 -- }}}
 
 -- HELPERS {{{
+
+--- Adds an item to the LRU cache, evicting the oldest entry if cache is full
+--- @param url string - the URL key
+--- @param info table - the video info to cache
+local function cache_video_info(url, info)
+	-- If already in cache, remove from order list (will be re-added at end)
+	if video_info_cache[url] then
+		for i, cached_url in ipairs(video_info_cache_order) do
+			if cached_url == url then
+				table.remove(video_info_cache_order, i)
+				break
+			end
+		end
+	end
+
+	-- Evict oldest entry if cache is full
+	while #video_info_cache_order >= VIDEO_INFO_CACHE_MAX_SIZE do
+		local oldest_url = table.remove(video_info_cache_order, 1)
+		video_info_cache[oldest_url] = nil
+		if debug then
+			print("LRU cache evicted: " .. oldest_url)
+		end
+	end
+
+	-- Add to cache and order list
+	video_info_cache[url] = info
+	table.insert(video_info_cache_order, url)
+end
+
+--- Gets an item from the LRU cache, updating access order
+--- @param url string - the URL key
+--- @return table | nil - the cached video info, or nil if not found
+local function get_cached_video_info(url)
+	local info = video_info_cache[url]
+	if info then
+		-- Move to end of order list (most recently used)
+		for i, cached_url in ipairs(video_info_cache_order) do
+			if cached_url == url then
+				table.remove(video_info_cache_order, i)
+				table.insert(video_info_cache_order, url)
+				break
+			end
+		end
+	end
+	return info
+end
+
+--- Truncates a string to a maximum length, adding ellipsis if truncated
+--- @param s string - the string to truncate
+--- @param max_len number - the maximum length
+--- @return string - the truncated string
+local function truncate_string(s, max_len)
+	if not s or max_len <= 0 then
+		return s or ""
+	end
+	if #s <= max_len then
+		return s
+	end
+	if max_len <= 3 then
+		return string.sub(s, 1, max_len)
+	end
+	return string.sub(s, 1, max_len - 3) .. "..."
+end
 
 --- surround string with single quotes if it does not already have them
 --- @param s string - the string to surround with quotes
@@ -251,7 +322,8 @@ end
 --- @param channel_name string - the name of the channel
 --- @return string - the OSD row
 local function build_osd_row(prefix, s, i, video_name, channel_name)
-	return prefix .. s .. i .. ". " .. video_name .. " - (" .. channel_name .. ")"
+	local truncated_name = truncate_string(video_name, options.max_title_length)
+	return prefix .. s .. i .. ". " .. truncated_name .. " - (" .. channel_name .. ")"
 end
 
 --- Helper function to determine display range for queue items
@@ -338,7 +410,20 @@ local function convert_to_json(key, val)
 		json = json .. "}"
 		return json
 	else
-		if type(val) == "string" then
+		-- Handle array values (table as val)
+		if type(val) == "table" then
+			local arr = "["
+			local first = true
+			for _, v in ipairs(val) do
+				if not first then
+					arr = arr .. ", "
+				end
+				first = false
+				arr = arr .. string.format('"%s"', v)
+			end
+			arr = arr .. "]"
+			return string.format('{"%s": %s}', key, arr)
+		elseif type(val) == "string" then
 			return string.format('{"%s": "%s"}', key, val)
 		else
 			return string.format('{"%s": %s}', key, tostring(val))
@@ -392,6 +477,19 @@ end
 --- @param url string - the URL to get the video info from
 --- @return table | nil - a table containing the video information
 function YouTubeQueue.get_video_info(url)
+	-- Check LRU cache first
+	local cached = get_cached_video_info(url)
+	if cached then
+		if debug then
+			print("Cache hit for URL: " .. url)
+		end
+		return cached
+	end
+
+	if debug then
+		print("Cache miss for URL: " .. url)
+	end
+
 	print_osd_message("Getting video info...", MSG_DURATION * 2)
 	local res = mp.command_native({
 		name = "subprocess",
@@ -443,6 +541,8 @@ function YouTubeQueue.get_video_info(url)
 		return nil
 	end
 
+	-- Cache the result with LRU eviction
+	cache_video_info(url, info)
 	return info
 end
 
@@ -450,7 +550,7 @@ end
 function YouTubeQueue.print_current_video()
 	destroy()
 	local current = current_video
-	if current and current.vidro_url ~= "" and is_file(current.video_url) then
+	if current and current.video_url ~= "" and is_file(current.video_url) then
 		print_osd_message("Playing: " .. current.video_url, 3)
 	else
 		if current and current.video_url then
@@ -557,26 +657,36 @@ function YouTubeQueue.reorder_queue(from_index, to_index)
 	end
 	-- Check if the provided indices are within the bounds of the video_queue
 	if from_index > 0 and from_index <= #video_queue and to_index > 0 and to_index <= #video_queue then
-		-- move the video from the from_index to to_index in the internal playlist.
-		-- playlist-move is 0-indexed
-		if from_index < to_index and to_index == #video_queue then
-			mp.commandv("playlist-move", from_index - 1, to_index)
-			if to_index > index then
-				index = index - 1
-			end
-		elseif from_index < to_index then
-			mp.commandv("playlist-move", from_index - 1, to_index)
-			if to_index > index then
-				index = index - 1
-			end
+		-- mpv's playlist-move moves entry at index1 to position before index2 (0-indexed)
+		-- When moving to end of playlist, use playlist count as target
+		local mpv_from = from_index - 1
+		local mpv_to
+		if from_index < to_index then
+			-- Moving forward: playlist-move needs the position after target
+			mpv_to = to_index
 		else
-			mp.commandv("playlist-move", from_index - 1, to_index - 1)
+			-- Moving backward: playlist-move needs the target position
+			mpv_to = to_index - 1
 		end
+		mp.commandv("playlist-move", mpv_from, mpv_to)
 
-		-- Remove from from_index and insert at to_index into YouTubeQueue
+		-- Update our queue: remove from old position, insert at new
 		local temp_video = video_queue[from_index]
 		table.remove(video_queue, from_index)
 		table.insert(video_queue, to_index, temp_video)
+
+		-- Update current index if affected by the move
+		if from_index == index then
+			-- We moved the currently playing video
+			index = to_index
+		elseif from_index < index and to_index >= index then
+			-- Moved an item from before current to at/after current: current shifts back
+			index = index - 1
+		elseif from_index > index and to_index <= index then
+			-- Moved an item from after current to at/before current: current shifts forward
+			index = index + 1
+		end
+		selected_index = to_index
 	else
 		print_osd_message("Invalid indices for reordering. No changes made.", MSG_DURATION, style.error)
 	end
@@ -597,7 +707,13 @@ function YouTubeQueue.print_queue(duration)
 	end
 
 	local ass = assdraw.ass_new()
-	ass:append(style.header .. "MPV-YOUTUBE-QUEUE{\\u0\\b0}" .. style.reset .. style.font .. "\n")
+	local position_indicator = ""
+	if index > 0 then
+		position_indicator = " [" .. index .. "/" .. #video_queue .. "]"
+	else
+		position_indicator = " [" .. #video_queue .. " videos]"
+	end
+	ass:append(style.header .. "MPV-YOUTUBE-QUEUE" .. position_indicator .. "{\\u0\\b0}" .. style.reset .. style.font .. "\n")
 
 	local start_index, end_index = get_display_range(#video_queue, selected_index, options.display_limit)
 
@@ -750,7 +866,7 @@ end
 --- @param idx number - the index of the video to download
 --- @return boolean - true if the video was downloaded successfully, false otherwise
 function YouTubeQueue.download_video_at(idx)
-	if idx < 0 or idx > #video_queue then
+	if idx <= 0 or idx > #video_queue then
 		return false
 	end
 	local v = video_queue[idx]
@@ -806,10 +922,11 @@ function YouTubeQueue.remove_from_queue()
 		print_osd_message("Cannot remove current video", MSG_DURATION, style.error)
 		return false
 	end
+	local removed_video = video_queue[selected_index]
 	table.remove(video_queue, selected_index)
 	mp.commandv("playlist-remove", selected_index - 1)
-	if current_video and current_video.video_name then
-		print_osd_message("Deleted " .. current_video.video_name .. " from queue.", MSG_DURATION)
+	if removed_video and removed_video.video_name then
+		print_osd_message("Deleted " .. removed_video.video_name .. " from queue.", MSG_DURATION)
 	end
 	if selected_index > 1 then
 		selected_index = selected_index - 1
@@ -940,8 +1057,11 @@ function YouTubeQueue.load_queue()
 				local l = result.stdout:sub(2, -3)
 				local item
 				for turl in l:gmatch("[^,]+") do
-					item = turl:match("^%s*(.-)%s*$"):gsub('"', "'")
-					table.insert(urls, item)
+					local trimmed = turl:match("^%s*(.-)%s*$")
+					if trimmed then
+						item = trimmed:gsub('"', "'")
+						table.insert(urls, item)
+					end
 				end
 				for _, turl in ipairs(urls) do
 					YouTubeQueue.add_to_queue(turl, 0)
@@ -952,6 +1072,55 @@ function YouTubeQueue.load_queue()
 	end)
 end
 
+--- Function to sync the video queue with mpv's internal playlist
+--- @return boolean - true if sync was successful, false otherwise
+function YouTubeQueue.sync_with_playlist()
+	if debug then
+		print("Syncing with internal playlist")
+	end
+
+	-- Get the current playlist count
+	local count = mp.get_property_number("playlist-count")
+	if count == 0 then
+		return false
+	end
+
+	-- Clear our queue
+	video_queue = {}
+
+	-- Add each item from the playlist to our queue
+	for i = 0, count - 1 do
+		local url = mp.get_property(string.format("playlist/%d/filename", i))
+		if url then
+			if not is_file(url) then
+				local info = YouTubeQueue.get_video_info(url)
+				if info then
+					info["video_url"] = url
+					table.insert(video_queue, info)
+				end
+			else
+				local channel_url, video_name = split_path(url)
+				if not isnull(channel_url) and not isnull(video_name) then
+					table.insert(video_queue, {
+						video_url = url,
+						video_name = video_name,
+						channel_url = channel_url,
+						channel_name = "Local file",
+						thumbnail_url = "",
+						view_count = "",
+						upload_date = "",
+						category = "",
+						subscribers = "",
+					})
+				end
+			end
+		end
+	end
+
+	-- Update current index
+	YouTubeQueue.update_current_index(false)
+	return true
+end
 -- }}}
 
 -- LISTENERS {{{
@@ -988,10 +1157,8 @@ local function on_playback_restart()
 		print("Playback restart event triggered.")
 	end
 	if current_video == nil then
-		local url = mp.get_property("path")
-		YouTubeQueue.add_to_queue(url)
-		---@diagnostic disable-next-line: param-type-mismatch
-		YouTubeQueue.add_to_history_db(current_video)
+		-- Instead of just adding the current file, sync with the entire playlist
+		YouTubeQueue.sync_with_playlist()
 	end
 end
 
@@ -1050,6 +1217,13 @@ mp.register_event("end-file", on_end_file)
 mp.register_event("track-changed", on_track_changed)
 mp.register_event("playback-restart", on_playback_restart)
 mp.register_event("file-loaded", on_file_loaded)
+mp.add_hook("on_load", 50, function()
+	if debug then
+		print("Startup hook triggered")
+	end
+	YouTubeQueue.sync_with_playlist()
+end)
+
 
 -- keep for backwards compatibility
 mp.register_script_message("add_to_queue", YouTubeQueue.add_to_queue)
