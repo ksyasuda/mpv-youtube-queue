@@ -12,6 +12,7 @@ A Lua script that replicates and extends the YouTube "Add to Queue" feature for 
 
 - **Interactive Queue Management:** A menu-driven interface for adding, removing, and rearranging videos in your queue
 - **yt-dlp Integration:** Gathers video info and allows downloading with any link supported by [yt-dlp](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md "yd-dlp supported sites page")
+- **External Stream Fallbacks:** When rich extractor metadata is unavailable, playlist items can still be queued using mpv metadata such as `media-title`
 - **Internal Playlist Integration:** Seamlessly integrates with mpv's internal playlist for a unified playback experience
 - **Customizable Keybindings:** Assign your preferred hotkeys to interact with the currently playing video and queue
 
@@ -25,9 +26,9 @@ This script requires the following software to be installed on the system
 
 ## Installation
 
-- Copy `mpv-youtube-queue.lua` script to your `~~/scripts` directory
-  - `~/.config/mpv/scripts` on Linux
-  - `%APPDATA%\mpv\scripts` on Windows
+- Copy the `mpv-youtube-queue/` directory to your `~~/scripts` directory
+  - Result on Linux: `~/.config/mpv/scripts/mpv-youtube-queue/main.lua`
+  - Result on Windows: `%APPDATA%\mpv\scripts\mpv-youtube-queue\main.lua`
 - Optionally copy `mpv-youtube-queue.conf` to the `~~/script-opts` directory
   - `~/.config/mpv/script-opts` on Linux
   - `%APPDATA%\mpv\script-opts` on Windows
@@ -42,9 +43,7 @@ This script requires the following software to be installed on the system
 - `download_selected_video - ctrl+D`: Download the currently selected video
   in the queue
 - `move_cursor_down - ctrl+j`: Move the cursor down one row in the queue
-- `move_cursor_up - ctrl+k`- Move the cursor up one row in the queue
-- `load_queue - ctrl+l` - Appends the videos from the most recent save point to the
-  queue
+- `move_cursor_up - ctrl+k`: Move the cursor up one row in the queue
 - `move_video - ctrl+m`: Mark/move the selected video in the queue
 - `play_next_in_queue - ctrl+n`: Play the next video in the queue
 - `open_video_in_browser - ctrl+o`: Open the currently playing video in the browser
@@ -54,10 +53,6 @@ This script requires the following software to be installed on the system
 - `print_current_video - ctrl+P`: Print the name and channel of the currently
   playing video to the OSD
 - `print_queue - ctrl+q`: Print the contents of the queue to the OSD
-- `save_queue - ctrl+s`: Saves the queue using the chosen method in
-  `default_save_method`
-- `save_queue_alt - ctrl+S`: Saves the queue using the method not chosen in
-  `default_save_method`
 - `remove_from_queue - ctrl+x`: Remove the currently selected video from the
   queue
 - `play_selected_video - ctrl+ENTER`: Play the currently selected video in
@@ -65,14 +60,11 @@ This script requires the following software to be installed on the system
 
 ### Default Options
 
-- `default_save_method - unwatched`: The default method to use when saving the
-  queue. Valid options are `unwatched` or `all`. Defaults to `unwatched`
-  - Whichever option is chosen is the default method for the `save_queue`
-    binding, and the other method will be bound to `save_queue_alt`
 - `browser - firefox`: The browser to use when opening a video or channel page
 - `clipboard_command - xclip -o`: The command to use to get the contents of the clipboard
 - `cursor_icon - ➤`: The icon to use for the cursor
 - `display_limit - 10`: The maximum amount of videos to show on the OSD at once
+- `max_title_length - 60`: Maximum OSD title length before truncation
 - `download_directory - ~/videos/YouTube`: The directory to use when downloading a video
 - `download_quality 720p`: The maximum download quality
 - `downloader - curl`: The name of the program to use to download the video
@@ -84,7 +76,7 @@ This script requires the following software to be installed on the system
 - `ytdlp_file_format - mp4`: The preferred file format for downloaded videos
 - `ytdlp_output_template - %(uploader)s/%(title)s.%(ext)s`: The [yt-dlp output template string](https://github.com/yt-dlp/yt-dlp#output-template)
   - Full path with the default `download_directory` is: `~/videos/YouTube/<uploader>/<title>.<ext>`
-- `use_history_db - no`: Enable watch history tracking and remote video queuing through integration with [mpv-youtube-queue-server](https://gitea.suda.codes/sudacode/mpv-youtube-queue-server)
+- `use_history_db - no`: Enable watch history tracking through integration with [mpv-youtube-queue-server](https://gitea.suda.codes/sudacode/mpv-youtube-queue-server)
 - `backend_host`: ip or hostname of the backend server
 - `backend_port`: port to connect to for the backend server
 
